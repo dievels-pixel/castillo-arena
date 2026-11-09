@@ -1,0 +1,52 @@
+/* Layout: one portrait stage (9:16) scaled to fit the screen. A WebGL canvas fills it; HUD, banner and game-over are DOM layers sized in em over the canvas. Single look by choice: a sunny toy-like beach. */
+:root{
+  --sea:#27b3c7; --sea-deep:#0b6b84; --foam:#f3fbf7;
+  --sand:#ecd49b; --sand-dark:#c99d55; --ink:#3b2814;
+  --coral:#ff5d4a; --coral-dark:#b83a2b; --shell:#f7a8ba; --gold:#f4b92e;
+  --night:#0f3a47;
+  --display:'Fredoka','Trebuchet MS',system-ui,sans-serif;
+  --body:'Nunito',system-ui,sans-serif;
+}
+[hidden]{display:none!important}
+html,body{height:100%;box-sizing:border-box;margin:0}
+body{
+  background:var(--night);color:var(--ink);font-family:var(--body);
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;overflow:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+#slot{flex:1 1 0;min-width:0;height:100%;display:flex;align-items:center;justify-content:center;padding-block:8px;box-sizing:border-box}
+#stage{position:relative;width:360px;height:640px;border-radius:1.6em;overflow:hidden;background:var(--sea-deep);box-shadow:0 .6em 2.4em rgba(0,0,0,.45);touch-action:none}
+#gl{position:absolute;inset:0}
+#gl canvas{display:block}
+.fail{position:absolute;inset:0;display:grid;place-items:center;padding:2em;text-align:center;color:#fff;font:600 1.6em var(--display)}
+
+#hud{position:absolute;left:0;right:0;top:0;display:flex;gap:.6em;align-items:center;padding:.8em;pointer-events:none;font-family:var(--display);color:#fff}
+.chip{display:flex;align-items:center;gap:.5em;background:rgba(8,44,58,.66);border-radius:99em;padding:.45em .9em;font-size:1.35em;line-height:1;font-weight:600;white-space:nowrap}
+.chip b{font-variant-numeric:tabular-nums;font-weight:700}
+.chip.hp{flex:1;min-width:0}
+.bar{flex:1;height:.75em;border-radius:99em;background:rgba(255,255,255,.25);overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffb347,#ff5d4a);border-radius:99em;transition:width .2s}
+.bar i.low{background:#ff3b30}
+.ic{width:1.15em;height:1.15em;flex:none}
+#shellChip{transition:transform .12s}
+
+#banner{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;font:700 3.2em var(--display);color:#fff;text-shadow:0 .06em 0 var(--sea-deep),0 0 .4em rgba(11,107,132,.8);opacity:0}
+#hint{position:absolute;left:1.5em;right:1.5em;top:46%;text-align:center;pointer-events:none;font:700 1.45em/1.35 var(--display);color:#fff;background:rgba(8,44,58,.72);border-radius:1.2em;padding:.7em 1em;opacity:0;transition:opacity .4s}
+#fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.float{position:absolute;transform:translate(-50%,-50%);font:700 1.5em var(--display);color:#fff;text-shadow:0 0 .2em #2a6b86,0 .08em 0 #2a6b86;white-space:nowrap}
+#joy{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
+#joy i{position:absolute;border-radius:50%;transform:translate(-50%,-50%)}
+#joyRing{width:7.2em;height:7.2em;border:.2em solid rgba(255,255,255,.6)}
+#joyKnob{width:2.8em;height:2.8em;background:rgba(255,255,255,.55)}
+
+#over{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,44,58,.72);padding:1.5em}
+.card{background:var(--sand);border-radius:1.4em;padding:1.6em 1.6em 1.4em;text-align:center;max-width:26em;box-shadow:0 .5em 2em rgba(0,0,0,.4)}
+.card h2{margin:0 0 .4em;font:700 2.6em/1.1 var(--display);color:var(--ink);text-wrap:balance}
+.card p{margin:0 0 1.1em;font-size:1.5em;font-weight:600;color:#6b4e2a;line-height:1.35}
+.btn{font:700 1.7em var(--display);color:#fff;background:var(--coral);border:0;border-radius:99em;padding:.45em 1em;box-shadow:0 .18em 0 var(--coral-dark);cursor:pointer}
+.btn:active{transform:translateY(.1em);box-shadow:0 .08em 0 var(--coral-dark)}
+button:focus-visible{outline:.15em solid #fff;outline-offset:.15em}

@@ -1,0 +1,23 @@
+# Castillo de Arena: instrucciones para Claude
+
+## Quién trabaja aquí
+Diego es el autor del juego. No es programador: decide el diseño y prueba, Claude escribe el código.
+- Habla siempre en español de España.
+- Explica los cambios en términos de juego ("ahora los bebés grandes van más lentos"), no de código, salvo que pregunte.
+- Si una petición es ambigua o tiene un coste oculto (rendimiento en móvil, romper otra mecánica), dilo antes de hacerla.
+- Haz cambios pequeños, uno por petición, y deja un commit por cambio con mensaje en español.
+
+## El juego
+Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en bañador dispara bolas de arena automáticamente a los bebés que vienen a destrozar el castillo. Los bebés se van llorando y sueltan conchas. Las conchas se gastan colocándose sobre recuadros en el suelo (tienda tipo Kingshot): cadencia, daño, alcance, muralla, amigos que disparan desde agujeros y reparar.
+
+## Estructura
+- `index.html`: página y capas de interfaz (marcador, carteles, fin de partida).
+- `css/style.css`: estilos.
+- `js/game.js`: todo el juego (three.js r128 desde CDN, sin compilación).
+  - La lógica trabaja en 2D en "píxeles de playa" (360x640); `wx()`/`wz()` convierten a coordenadas 3D.
+  - Datos ajustables: `TYPES` (bebés), `UPG` (mejoras), `WALL_COST`, `FRIEND_COST`, `PADS` (recuadros).
+  - `update(dt)` simula, `sync(now)` coloca los objetos 3D.
+
+## Cómo probar
+No hay build. Abrir `index.html` en el navegador (en local, mejor con un servidor simple: `python3 -m http.server`). Se juega con el dedo (joystick al arrastrar) o con WASD/flechas.
+Objetivo: que funcione fluido en móvil en vertical.
