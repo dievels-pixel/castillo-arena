@@ -388,8 +388,8 @@ const PADS = [
 const PAD_W = 70;
 
 const cam = { x: CX - VW / 2, y: 0 };
-let S, best = 0, mode = 'start';   // mode: start | play | pause
-try { best = +localStorage.getItem('castillo-arena-best') || 0; } catch (e) {}
+let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause
+try { best = +localStorage.getItem('castillo-arena-best') || 0; bestKills = +localStorage.getItem('castillo-arena-best-kills') || 0; } catch (e) {}
 
 function padState(p) {
   const id = p.id;
@@ -525,7 +525,7 @@ addEventListener('blur', () => keys.clear());
 $('again').addEventListener('click', () => { audioOn(); $('over').hidden = true; newGame(); mode = 'play'; });
 function showStart() {
   mode = 'start'; $('paused').hidden = true; $('over').hidden = true; $('start').hidden = false;
-  const r = $('startRec'); r.hidden = !best; r.textContent = 'Tu récord: oleada ' + best;
+  const r = $('startRec'); r.hidden = !best; r.textContent = 'Tu récord: oleada ' + best + ' · ' + bebes(bestKills);
 }
 function pause() {
   if (mode !== 'play' || S.over) return;
@@ -541,10 +541,15 @@ $('quit').addEventListener('click', () => { newGame(); showStart(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause()); });
 
+const bebes = n => n + (n === 1 ? ' bebé' : ' bebés');
 function gameOver() {
   S.over = true; sfx('over'); joy.on = false; joy.vx = joy.vy = 0; joyDom();
-  if (S.wave > best) { best = S.wave; try { localStorage.setItem('castillo-arena-best', String(best)); } catch (e) {} }
-  $('overTxt').textContent = 'Has aguantado hasta la oleada ' + S.wave + ' y has mandado llorando a ' + S.kills + (S.kills === 1 ? ' bebé' : ' bebés') + '. Tu récord es la oleada ' + best + '.';
+  const newWave = S.wave > best, newKills = S.kills > bestKills;
+  if (newWave) best = S.wave;
+  if (newKills) bestKills = S.kills;
+  try { localStorage.setItem('castillo-arena-best', String(best)); localStorage.setItem('castillo-arena-best-kills', String(bestKills)); } catch (e) {}
+  $('overTxt').textContent = 'Has aguantado hasta la oleada ' + S.wave + ' y has mandado llorando a ' + bebes(S.kills) + '. ' +
+    (newWave || newKills ? '¡Nuevo récord! ' : '') + 'Tu récord: oleada ' + best + ' y ' + bebes(bestKills) + ' en una partida.';
   $('over').hidden = false;
 }
 
