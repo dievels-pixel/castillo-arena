@@ -310,6 +310,62 @@ function floatText(txt, x, y, h) {
   f.txt = txt; f.life = 1.1; f.x = x; f.y = y; f.h = h;
 }
 
+/* ---------- sound, synthesised in the browser (no audio files) ---------- */
+const AC = window.AudioContext || window.webkitAudioContext;
+let ac = null, master = null, noiseBuf = null, muted = false;
+const lastSfx = {};
+try { muted = localStorage.getItem('castillo-arena-mute') === '1'; } catch (e) {}
+function audioOn() {
+  if (!AC) return;
+  try {
+    if (!ac) {
+      ac = new AC(); master = ac.createGain(); master.gain.value = .55; master.connect(ac.destination);
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * .5, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (ac.state === 'suspended') ac.resume();
+  } catch (e) { ac = null; }
+}
+function env(g, t, vol, dur) { g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.0001, t + dur); }
+function tone(type, f0, f1, dur, vol, delay, vib) {
+  const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  if (vib) { const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = vib; lg.gain.value = f0 * .06; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + dur + .05); }
+  env(g, t, vol, dur); o.connect(g);
+  if (type === 'sawtooth') { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; g.connect(f); f.connect(master); } else g.connect(master);
+  o.start(t); o.stop(t + dur + .05);
+}
+function noise(dur, vol, freq, type) {
+  const t = ac.currentTime, src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  src.buffer = noiseBuf; f.type = type || 'bandpass'; f.frequency.value = freq; env(g, t, vol, dur);
+  src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .05);
+}
+const SFX_GAP = { throw: 70, hit: 45, cry: 200, pick: 40, pay: 90, castle: 120 };
+function sfx(name) {
+  if (muted || !ac || ac.state !== 'running') return;
+  const now = performance.now(); if (now - (lastSfx[name] || 0) < (SFX_GAP[name] || 0)) return; lastSfx[name] = now;
+  const j = .92 + Math.random() * .16;
+  switch (name) {
+    case 'throw': noise(.08, .1, 1600 * j); break;
+    case 'hit': tone('triangle', 240 * j, 110, .09, .22); noise(.06, .12, 500); break;
+    case 'cry': tone('sawtooth', 560 * j, 360 * j, .5, .06, 0, 8); break;
+    case 'pick': tone('sine', 1320 * j, 1900 * j, .09, .14); break;
+    case 'pay': tone('square', 700, 700, .035, .035); break;
+    case 'buy': [523, 659, 784].forEach((f, i) => tone('sine', f, f, .16, .18, i * .07)); break;
+    case 'wave': tone('triangle', 392, 392, .14, .16); tone('triangle', 523, 523, .22, .16, .13); break;
+    case 'clear': [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f, .14, .14, i * .08)); break;
+    case 'castle': tone('sine', 95, 50, .2, .35); noise(.12, .1, 300, 'lowpass'); break;
+    case 'crumble': noise(.35, .25, 450, 'lowpass'); break;
+    case 'over': [392, 330, 262].forEach((f, i) => tone('triangle', f, f * .97, .32, .18, i * .3)); break;
+  }
+}
+function setMuted(m) {
+  muted = m; try { localStorage.setItem('castillo-arena-mute', m ? '1' : '0'); } catch (e) {}
+  document.querySelectorAll('.snd').forEach(b => { b.textContent = 'Sonido: ' + (m ? 'no' : 'sí'); });
+}
+document.querySelectorAll('.snd').forEach(b => b.addEventListener('click', () => { audioOn(); setMuted(!muted); sfx('pick'); }));
+setMuted(muted);
+
 /* ---------- game data ---------- */
 const TYPES = {
   normal: { hp: 4,  sp: 34, r: 11, drop: [1, 2], atk: 3, rate: .9 },
@@ -369,7 +425,7 @@ function completePad(p) {
     walls.forEach(w => { if (w.built) w.hp = Math.min(wallMax(), w.hp + .35 * wallMax()); });
   }
   p.prog = 0; p.acc = 0; p.key = ''; updateHud();
-  puff(p.x, p.y, 6, 16, '#fff3b0');
+  puff(p.x, p.y, 6, 16, '#fff3b0'); sfx('buy');
 }
 
 /* ---------- pads (flat squares on the sand); each label is cached on its own small canvas ---------- */
@@ -418,7 +474,7 @@ function newGame() {
   startWave(1); updateHud(); followCam();
 }
 function startWave(n) {
-  S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; S.bannerTxt = 'Oleada ' + n;
+  S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; S.bannerTxt = 'Oleada ' + n; sfx('wave');
   $('waveNo').textContent = n;
 }
 function updateHud() {
@@ -443,6 +499,7 @@ function joyDom() {
   $('joyKnob').style.left = joy.vx * 36 * scale + 'px'; $('joyKnob').style.top = joy.vy * 36 * scale + 'px';
 }
 stage.addEventListener('pointerdown', e => {
+  audioOn();
   if (mode !== 'play' || S.over || e.target.closest('button')) return;
   const p = toLog(e); joy.on = true; joy.id = e.pointerId; joy.ox = p.x; joy.oy = p.y; joy.vx = joy.vy = 0; joyDom();
   try { stage.setPointerCapture(e.pointerId); } catch (err) {}
@@ -465,7 +522,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
-$('again').addEventListener('click', () => { $('over').hidden = true; newGame(); mode = 'play'; });
+$('again').addEventListener('click', () => { audioOn(); $('over').hidden = true; newGame(); mode = 'play'; });
 function showStart() {
   mode = 'start'; $('paused').hidden = true; $('over').hidden = true; $('start').hidden = false;
   const r = $('startRec'); r.hidden = !best; r.textContent = 'Tu récord: oleada ' + best;
@@ -476,8 +533,8 @@ function pause() {
   $('pauseTxt').textContent = 'Oleada ' + S.wave + ' · ' + S.kills + (S.kills === 1 ? ' bebé' : ' bebés') + ' llorando';
   $('paused').hidden = false;
 }
-function resume() { if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
-$('play').addEventListener('click', () => { $('start').hidden = true; newGame(); mode = 'play'; });
+function resume() { audioOn(); if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
+$('play').addEventListener('click', () => { audioOn(); $('start').hidden = true; newGame(); mode = 'play'; });
 $('pauseBtn').addEventListener('click', () => (mode === 'pause' ? resume() : pause()));
 $('resume').addEventListener('click', resume);
 $('quit').addEventListener('click', () => { newGame(); showStart(); });
@@ -485,7 +542,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause()); });
 
 function gameOver() {
-  S.over = true; joy.on = false; joy.vx = joy.vy = 0; joyDom();
+  S.over = true; sfx('over'); joy.on = false; joy.vx = joy.vy = 0; joyDom();
   if (S.wave > best) { best = S.wave; try { localStorage.setItem('castillo-arena-best', String(best)); } catch (e) {} }
   $('overTxt').textContent = 'Has aguantado hasta la oleada ' + S.wave + ' y has mandado llorando a ' + S.kills + (S.kills === 1 ? ' bebé' : ' bebés') + '. Tu récord es la oleada ' + best + '.';
   $('over').hidden = false;
@@ -519,17 +576,18 @@ function die(b) {
   const T = TYPES[b.type], n = T.drop[0] + Math.floor(Math.random() * (T.drop[1] - T.drop[0] + 1));
   for (let i = 0; i < n; i++) addDrop(b.x, b.y, 'shell', 1);
   if (b.type === 'big') addDrop(b.x, b.y, 'conch', 5);
+  sfx('cry');
   if (Math.random() < .6) floatText(['¡Buaaa!', '¡Uaaa!', '¡Buaaaa!'][Math.floor(Math.random() * 3)], b.x, b.y, 44);
 }
 function hitCastle(d) {
-  S.hp = Math.max(0, S.hp - d); S.shake = .25;
+  S.hp = Math.max(0, S.hp - d); S.shake = .25; sfx('castle');
   puff(CX + rnd(-40, 40), CY + 8, 30, 3, '#d9b873'); updateHud();
   if (S.hp <= 0) gameOver();
 }
 function hitWall(w, d) {
   const x = CX + Math.cos(w.a) * WALL_R, y = CY + Math.sin(w.a) * WALL_R;
   w.hp -= d; w.shake = .2; puff(x, y, 18, 3, '#d9b873');
-  if (w.hp <= 0) { w.hp = 0; puff(x, y, 14, 12, '#d9b873'); }
+  if (w.hp <= 0) { w.hp = 0; sfx('crumble'); puff(x, y, 14, 12, '#d9b873'); }
 }
 function nearest(x, y, range) {
   let t = null, bd = 1e9;
@@ -573,7 +631,7 @@ function update(dt) {
   else if (p.moving) p.aim = Math.atan2(iy, ix);
   p.fireT -= dt;
   if (p.fireT <= 0) {
-    if (target) { shoot(p.x + Math.cos(p.aim) * 10, p.y + Math.sin(p.aim) * 10, p.aim, 2 + .6 * S.up.power, range + 40); p.kick = .1; p.fireT = 1 / (1.6 + .45 * S.up.rate); }
+    if (target) { shoot(p.x + Math.cos(p.aim) * 10, p.y + Math.sin(p.aim) * 10, p.aim, 2 + .6 * S.up.power, range + 40); p.kick = .1; sfx('throw'); p.fireT = 1 / (1.6 + .45 * S.up.rate); }
     else p.fireT = 0;
   }
 
@@ -599,7 +657,7 @@ function update(dt) {
         if (Math.hypot(b.x - bl.x, b.y - bl.y) < b.r + 4) {
           b.hp -= bl.dmg; b.flash = .12;
           const l = Math.hypot(bl.vx, bl.vy); b.x += bl.vx / l * 3; b.y += bl.vy / l * 3;
-          puff(bl.x, bl.y, 20, 5, '#d4ad6a');
+          puff(bl.x, bl.y, 20, 5, '#d4ad6a'); sfx('hit');
           if (b.hp <= 0) die(b);
           gone = true; break;
         }
@@ -646,7 +704,7 @@ function update(dt) {
     if (s.t > .35 && d < magR && d > .001) { const v = 240 + (magR - d) * 3; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
     else { s.x += s.vx * dt; s.y += s.vy * dt; const f = Math.pow(.02, dt); s.vx *= f; s.vy *= f; }
     s.x = clamp(s.x, 8, W - 8); s.y = clamp(s.y, 72, H - 8);
-    if (d < 14 && s.t > .25) { S.shells += s.v; S.bump = .25; ents.drops.splice(i, 1); updateHud(); }
+    if (d < 14 && s.t > .25) { S.shells += s.v; S.bump = .25; sfx('pick'); ents.drops.splice(i, 1); updateHud(); }
   }
 
   // pads: stand on one to pay into it
@@ -659,7 +717,7 @@ function update(dt) {
       ap.acc += clamp(st.cost * 1.5, 12, 40) * dt;
       const n = Math.min(Math.floor(ap.acc), S.shells, st.cost - ap.prog);
       if (n > 0) {
-        ap.acc -= n; S.shells -= n; ap.prog += n; updateHud();
+        ap.acc -= n; S.shells -= n; ap.prog += n; updateHud(); sfx('pay');
         for (let k = 0; k < Math.min(n, 2); k++) ents.flies.push({ t: 0, sx: p.x, sy: p.y, tx: ap.x, ty: ap.y });
       }
       if (ap.prog >= st.cost) completePad(ap);
@@ -677,7 +735,7 @@ function update(dt) {
     S.spawnT -= dt;
     if (S.spawnT <= 0) { spawnBaby(); S.spawnLeft--; S.spawnT = Math.max(.45, 1.5 - .07 * S.wave) * (.7 + Math.random() * .6); }
   } else if (S.gap === null) {
-    if (!ents.babies.some(b => b.state === 'walk')) { S.gap = 2.2; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; }
+    if (!ents.babies.some(b => b.state === 'walk')) { S.gap = 2.2; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; sfx('clear'); }
   } else {
     S.gap -= dt; if (S.gap <= 0) startWave(S.wave + 1);
   }
