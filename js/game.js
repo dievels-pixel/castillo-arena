@@ -168,6 +168,7 @@ const FRIEND_COST = [20, 30, 45, 65, 90, 120];
 const wallMax = () => 60 + 40 * S.wallLvl;
 function drawWall(w, now) {
   const a0 = w.a - Math.PI / 10 + .035, a1 = w.a + Math.PI / 10 - .035, ri = WALL_R - 8, ro = WALL_R + 8;
+  if (!w.built && S.wallBuilt < 5 && walls[WALL_ORDER[S.wallBuilt]] === w) return;   // its pad is drawn there instead
   if (!w.built || w.hp <= 0) {
     ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.4)';
     ctx.beginPath(); ctx.arc(CX, CY, ro, a0, a1); ctx.arc(CX, CY, ri, a1, a0, true); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
@@ -383,9 +384,23 @@ const fRate = () => .7 + .12 * S.friendLvl, fDmg = () => 1.5 + .5 * S.friendLvl,
 
 const PADS = [
   { id: 'rate',   x: CX - 118, y: 540 }, { id: 'power',  x: CX, y: 540 }, { id: 'range',  x: CX + 118, y: 540 },
-  { id: 'wall',   x: CX - 118, y: 618 }, { id: 'friend', x: CX, y: 618 }, { id: 'repair', x: CX + 118, y: 618 }
+  { id: 'wall',   x: CX - 118, y: 618 }, { id: 'friend', x: CX + 118, y: 618 }, { id: 'repair', x: CX, y: 618 }
 ];
-const PAD_W = 70;
+const PAD_W = 70, SITE_W = 56, FRIEND_SITE_R = 175;
+// Upgrades live in the shop by the castle. Constructions (wall, friends) are paid on the spot where they will be
+// built; once all are built, their pad (Refuerzo / Entrenar) moves to its shop slot.
+function placePads() {
+  for (const p of padObjs) {
+    p.w = PAD_W; p.x = p.hx; p.y = p.hy;
+    if (p.id === 'wall' && S.wallBuilt < 5) {
+      const w = walls[WALL_ORDER[S.wallBuilt]];
+      p.w = SITE_W; p.x = CX + Math.cos(w.a) * WALL_R; p.y = CY + Math.sin(w.a) * WALL_R;
+    } else if (p.id === 'friend' && S.friends.length < 6) {
+      const h = holes[S.friends.length], a = Math.atan2(h.y - CY, h.x - CX);
+      p.w = SITE_W; p.x = CX + Math.cos(a) * FRIEND_SITE_R; p.y = CY + Math.sin(a) * FRIEND_SITE_R;
+    }
+  }
+}
 
 const cam = { x: CX - VW / 2, y: 0 };
 let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause
@@ -432,7 +447,7 @@ function completePad(p) {
 const padObjs = [];
 PADS.forEach(p => {
   const c = document.createElement('canvas'); c.width = c.height = 192;
-  p.cv = c; p.prog = 0; p.acc = 0; p.key = ''; p.pulse = 1;
+  p.cv = c; p.prog = 0; p.acc = 0; p.key = ''; p.hx = p.x; p.hy = p.y; p.w = PAD_W;
   padObjs.push(p);
 });
 function drawPad(p, st, active, can) {
@@ -471,7 +486,7 @@ function newGame() {
     up: { rate: 0, power: 0, range: 0 }, wallBuilt: 0, wallLvl: 0, friends: [], friendLvl: 0,
     player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
-  startWave(1); updateHud(); followCam();
+  startWave(1); updateHud(); followCam(); placePads();
 }
 function startWave(n) {
   S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; S.bannerTxt = 'Oleada ' + n; sfx('wave');
@@ -713,8 +728,8 @@ function update(dt) {
   }
 
   // pads: stand on one to pay into it
-  S.activePad = null;
-  for (const pad of padObjs) if (Math.abs(p.x - pad.x) < PAD_W / 2 && Math.abs(p.y - pad.y) < PAD_W / 2) { S.activePad = pad; break; }
+  S.activePad = null; placePads();
+  for (const pad of padObjs) if (Math.abs(p.x - pad.x) < pad.w / 2 && Math.abs(p.y - pad.y) < pad.w / 2) { S.activePad = pad; break; }
   const ap = S.activePad;
   if (ap) {
     const st = padState(ap);
@@ -784,9 +799,9 @@ function render(now) {
     const can = !st.maxed && st.enabled && S.shells >= Math.max(1, st.cost - pad.prog) && st.cost > 0;
     const key = [st.name, st.val, st.lvl, st.cost, pad.prog, st.maxed, st.enabled, active, can].join('|');
     if (key !== pad.key) { pad.key = key; drawPad(pad, st, active, can); }
-    const k = can ? 1 + Math.sin(now * 6) * .03 : 1, s = 35 * k;
-    ctx.fillStyle = '#cdb47a'; rr(ctx, pad.x - s, pad.y - s + 3, s * 2, s * 2, 10); ctx.fill();
-    ctx.fillStyle = '#f3e3b5'; rr(ctx, pad.x - s, pad.y - s, s * 2, s * 2, 10); ctx.fill();
+    const k = (can ? 1 + Math.sin(now * 6) * .03 : 1) * pad.w / PAD_W, s = 35 * k;
+    ctx.fillStyle = '#cdb47a'; rr(ctx, pad.x - s, pad.y - s + 3, s * 2, s * 2, 10 * k); ctx.fill();
+    ctx.fillStyle = '#f3e3b5'; rr(ctx, pad.x - s, pad.y - s, s * 2, s * 2, 10 * k); ctx.fill();
     ctx.drawImage(pad.cv, pad.x - 33 * k, pad.y - 33 * k, 66 * k, 66 * k);
   }
 
