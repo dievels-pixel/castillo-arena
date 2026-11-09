@@ -13,10 +13,10 @@ Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en
 ## Estructura
 - `index.html`: página y capas de interfaz (marcador, carteles, fin de partida).
 - `css/style.css`: estilos.
-- `js/game.js`: todo el juego (three.js r128 desde CDN, sin compilación).
-  - La lógica trabaja en 2D en "píxeles de playa" (360x640); `wx()`/`wz()` convierten a coordenadas 3D.
+- `js/game.js`: todo el juego, en 2D con Canvas y dibujado con código (sin librerías ni compilación).
+  - Todo trabaja en "píxeles de playa" (360x640, 20 px = 1 m). Vista cenital inclinada fija: la altura se dibuja hacia arriba (y - h) y se pinta de atrás adelante ordenando por y.
   - Datos ajustables: `TYPES` (bebés), `UPG` (mejoras), `WALL_COST`, `FRIEND_COST`, `PADS` (recuadros).
-  - `update(dt)` simula, `sync(now)` coloca los objetos 3D.
+  - `update(dt)` simula, `render(now)` dibuja. El fondo estático se pinta una vez en `buildBg()`.
 
 ## Cómo probar
 No hay build. Abrir `index.html` en el navegador (en local, mejor con un servidor simple: `python3 -m http.server`). Se juega con el dedo (joystick al arrastrar) o con WASD/flechas.
