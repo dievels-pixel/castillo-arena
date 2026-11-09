@@ -1,7 +1,7 @@
 # Castillo de Arena: instrucciones para Claude
 
 ## Quién trabaja aquí
-Diego es el autor del juego. Es ingeniero de estructuras, no programador: decide el diseño y prueba, Claude escribe el código.
+Diego es el autor del juego. No es programador: decide el diseño y prueba, Claude escribe el código.
 - Habla siempre en español de España.
 - Explica los cambios en términos de juego ("ahora los bebés grandes van más lentos"), no de código, salvo que pregunte.
 - Si una petición es ambigua o tiene un coste oculto (rendimiento en móvil, romper otra mecánica), dilo antes de hacerla.
