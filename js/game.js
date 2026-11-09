@@ -315,7 +315,7 @@ const PADS = [
 ];
 const PAD_W = 70;
 
-let S, best = 0;
+let S, best = 0, mode = 'start';   // mode: start | play | pause
 try { best = +localStorage.getItem('castillo-arena-best') || 0; } catch (e) {}
 
 function padState(p) {
@@ -426,7 +426,7 @@ function joyDom() {
   $('joyKnob').style.left = joy.vx * 36 * scale + 'px'; $('joyKnob').style.top = joy.vy * 36 * scale + 'px';
 }
 stage.addEventListener('pointerdown', e => {
-  if (S.over || e.target.closest('button')) return;
+  if (mode !== 'play' || S.over || e.target.closest('button')) return;
   const p = toLog(e); joy.on = true; joy.id = e.pointerId; joy.ox = p.x; joy.oy = p.y; joy.vx = joy.vy = 0; joyDom();
   try { stage.setPointerCapture(e.pointerId); } catch (err) {}
 });
@@ -448,7 +448,24 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
-$('again').addEventListener('click', () => { $('over').hidden = true; newGame(); });
+$('again').addEventListener('click', () => { $('over').hidden = true; newGame(); mode = 'play'; });
+function showStart() {
+  mode = 'start'; $('paused').hidden = true; $('over').hidden = true; $('start').hidden = false;
+  const r = $('startRec'); r.hidden = !best; r.textContent = 'Tu récord: oleada ' + best;
+}
+function pause() {
+  if (mode !== 'play' || S.over) return;
+  mode = 'pause'; joy.on = false; joy.vx = joy.vy = 0; joyDom(); keys.clear();
+  $('pauseTxt').textContent = 'Oleada ' + S.wave + ' · ' + S.kills + (S.kills === 1 ? ' bebé' : ' bebés') + ' llorando';
+  $('paused').hidden = false;
+}
+function resume() { if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
+$('play').addEventListener('click', () => { $('start').hidden = true; newGame(); mode = 'play'; });
+$('pauseBtn').addEventListener('click', () => (mode === 'pause' ? resume() : pause()));
+$('resume').addEventListener('click', resume);
+$('quit').addEventListener('click', () => { newGame(); showStart(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause()); });
 
 function gameOver() {
   S.over = true; joy.on = false; joy.vx = joy.vy = 0; joyDom();
@@ -511,7 +528,7 @@ function shoot(x, y, a, dmg, max) {
 }
 
 function update(dt) {
-  if (S.over) return;
+  if (mode !== 'play' || S.over) return;
   S.t += dt;
   const p = S.player;
   S.shake = Math.max(0, S.shake - dt); S.bump = Math.max(0, S.bump - dt);
@@ -717,14 +734,15 @@ function render(now) {
   // DOM overlays
   $('shellChip').style.transform = S.bump > 0 ? 'scale(' + (1 + S.bump * .6) + ')' : '';
   const bn = $('banner');
-  if (S.banner > 0 && !S.over) { const a = Math.min(1, S.banner / .5); bn.textContent = S.bannerTxt; bn.style.opacity = a; bn.style.transform = 'scale(' + (1 + (1 - a) * .15) + ')'; } else bn.style.opacity = 0;
-  $('hint').style.opacity = S.hint > 0 && !S.over ? Math.min(1, S.hint / 1.2) : 0;
+  if (S.banner > 0 && !S.over && mode === 'play') { const a = Math.min(1, S.banner / .5); bn.textContent = S.bannerTxt; bn.style.opacity = a; bn.style.transform = 'scale(' + (1 + (1 - a) * .15) + ')'; } else bn.style.opacity = 0;
+  $('hint').style.opacity = S.hint > 0 && !S.over && mode === 'play' ? Math.min(1, S.hint / 1.2) : 0;
 }
 
 /* ---------- loop ---------- */
 addEventListener('resize', fit);
 fit();
 newGame();
+showStart();
 let last = 0;
 function frame(ts) {
   const dt = Math.min(.05, (ts - last) / 1000 || 0); last = ts;
