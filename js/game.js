@@ -11,8 +11,9 @@ const TAU = Math.PI * 2;
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
    View: fixed top-down tilted camera; a thing's height above the sand is drawn upwards (y - h). ---------- */
-const W = 360, H = 640;
-const CX = 180, CY = 440, CR = 62;        // castle centre and its attack radius
+const VW = 360, VH = 640;                 // what the screen shows
+const W = 600, H = 760;                   // the whole beach; the camera follows the kid
+const CX = 300, CY = 440, CR = 62;        // castle centre and its attack radius
 const WALL_R = 112, HOLE_R = 84;          // wall arc radius and friends' holes radius
 const SEA_Y = 56;                         // shoreline
 
@@ -20,14 +21,14 @@ const SEA_Y = 56;                         // shoreline
 let scale = 1, PX = 1;
 function fit() {
   const aw = slot.clientWidth, ah = slot.clientHeight - 16;
-  scale = Math.max(0.3, Math.min(aw / W, ah / H));
+  scale = Math.max(0.3, Math.min(aw / VW, ah / VH));
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   PX = scale * dpr;
-  stage.style.width = W * scale + 'px';
-  stage.style.height = H * scale + 'px';
+  stage.style.width = VW * scale + 'px';
+  stage.style.height = VH * scale + 'px';
   stage.style.fontSize = 10 * scale + 'px';
-  cv.width = Math.round(W * PX); cv.height = Math.round(H * PX);
-  cv.style.width = W * scale + 'px'; cv.style.height = H * scale + 'px';
+  cv.width = Math.round(VW * PX); cv.height = Math.round(VH * PX);
+  cv.style.width = VW * scale + 'px'; cv.style.height = VH * scale + 'px';
   buildBg();
 }
 
@@ -67,17 +68,17 @@ for (let j = 0; j < 6; j++) {
   holes.push({ x: CX + Math.cos(a) * HOLE_R, y: CY + Math.sin(a) * HOLE_R });
 }
 function buildBg() {
-  bg.width = cv.width; bg.height = cv.height;
+  bg.width = Math.round(W * PX); bg.height = Math.round(H * PX);
   const t = bgx; t.setTransform(PX, 0, 0, PX, 0, 0);
   t.fillStyle = '#27b3c7'; t.fillRect(0, 0, W, SEA_Y);
   const g = t.createLinearGradient(0, SEA_Y - 8, 0, H); g.addColorStop(0, '#c9a869'); g.addColorStop(.06, '#e6cb8e'); g.addColorStop(1, '#f1dba6');
   t.fillStyle = g; t.fillRect(0, SEA_Y - 8, W, H);
   let s = 20261109; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 1500; i++) {
+  for (let i = 0; i < 2400; i++) {
     t.fillStyle = r() < .5 ? 'rgba(150,110,50,.16)' : 'rgba(255,248,222,.45)';
     t.beginPath(); t.arc(r() * W, SEA_Y + r() * (H - SEA_Y), .4 + r() * .8, 0, TAU); t.fill();
   }
-  const rocks = [[30, 130, 1], [330, 150, 0], [20, 300, 2], [345, 330, 1], [100, 190, 0], [270, 240, 2], [25, 470, 1], [340, 470, 0]];
+  const rocks = [[40, 130, 1], [560, 150, 0], [30, 330, 2], [575, 340, 1], [150, 200, 0], [440, 240, 2], [70, 520, 1], [540, 500, 0], [90, 700, 2], [520, 690, 1], [300, 735, 0]];
   rocks.forEach(([x, y, k]) => {
     const z = 6 + k * 2.5;
     t.fillStyle = 'rgba(90,60,20,.2)'; t.beginPath(); t.ellipse(x + 1, y + 1, z * 1.3, z * .5, 0, 0, TAU); t.fill();
@@ -89,6 +90,21 @@ function buildBg() {
     t.fillStyle = '#c99d55'; t.beginPath(); t.ellipse(h.x, h.y + 1, 14, 7.5, 0, 0, TAU); t.fill();
     t.fillStyle = '#4f3718'; t.beginPath(); t.ellipse(h.x, h.y, 10.5, 5.5, 0, 0, TAU); t.fill();
   });
+  // starfish
+  [[120, 420, .3], [490, 600, 1.2], [210, 690, 2.1], [560, 260, .8]].forEach(([x, y, a]) => {
+    t.save(); t.translate(x, y); t.rotate(a); t.fillStyle = '#f08a5d'; t.beginPath();
+    for (let k = 0; k < 10; k++) { const r2 = k % 2 ? 2.6 : 7, an = k / 10 * TAU - Math.PI / 2; t.lineTo(Math.cos(an) * r2, Math.sin(an) * r2 * .7); }
+    t.closePath(); t.fill(); t.restore();
+  });
+  // bucket and spade left by the castle
+  t.save(); t.translate(CX + 108, CY + 40);
+  t.fillStyle = 'rgba(90,60,20,.2)'; t.beginPath(); t.ellipse(2, 1, 11, 4, 0, 0, TAU); t.fill();
+  t.fillStyle = '#ff5d4a'; t.beginPath(); t.moveTo(-8, -16); t.lineTo(8, -16); t.lineTo(6, 0); t.lineTo(-6, 0); t.closePath(); t.fill();
+  t.fillStyle = '#d94436'; t.beginPath(); t.ellipse(0, -16, 8, 2.6, 0, 0, TAU); t.fill();
+  t.strokeStyle = '#fff'; t.lineWidth = 1; t.beginPath(); t.arc(0, -16, 7, Math.PI, 0); t.stroke();
+  t.strokeStyle = '#ffd23f'; t.lineWidth = 2; t.beginPath(); t.moveTo(14, -2); t.lineTo(22, -18); t.stroke();
+  t.fillStyle = '#2c6fe0'; t.beginPath(); t.ellipse(12.5, 1, 3.5, 5, .45, 0, TAU); t.fill();
+  t.restore();
   // castle mound
   t.fillStyle = '#d6ae66'; t.beginPath(); t.ellipse(CX, CY + 4, 92, 30, 0, 0, TAU); t.fill();
 }
@@ -310,11 +326,12 @@ const repairCost = () => 5 + 2 * S.wave;
 const fRate = () => .7 + .12 * S.friendLvl, fDmg = () => 1.5 + .5 * S.friendLvl, F_RANGE = 150;
 
 const PADS = [
-  { id: 'rate',   x: 62,  y: 528 }, { id: 'power',  x: 180, y: 528 }, { id: 'range',  x: 298, y: 528 },
-  { id: 'wall',   x: 62,  y: 598 }, { id: 'friend', x: 180, y: 598 }, { id: 'repair', x: 298, y: 598 }
+  { id: 'rate',   x: CX - 118, y: 540 }, { id: 'power',  x: CX, y: 540 }, { id: 'range',  x: CX + 118, y: 540 },
+  { id: 'wall',   x: CX - 118, y: 618 }, { id: 'friend', x: CX, y: 618 }, { id: 'repair', x: CX + 118, y: 618 }
 ];
 const PAD_W = 70;
 
+const cam = { x: CX - VW / 2, y: 0 };
 let S, best = 0, mode = 'start';   // mode: start | play | pause
 try { best = +localStorage.getItem('castillo-arena-best') || 0; } catch (e) {}
 
@@ -396,9 +413,9 @@ function newGame() {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
     over: false, shake: 0, bump: 0, hint: 9, activePad: null,
     up: { rate: 0, power: 0, range: 0 }, wallBuilt: 0, wallLvl: 0, friends: [], friendLvl: 0,
-    player: { x: 180, y: 560, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
+    player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
-  startWave(1); updateHud();
+  startWave(1); updateHud(); followCam();
 }
 function startWave(n) {
   S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; S.bannerTxt = 'Oleada ' + n;
@@ -548,6 +565,7 @@ function update(dt) {
   p.x = clamp(p.x, 14, W - 14); p.y = clamp(p.y, 76, H - 16);
   const pdx = p.x - CX, pdy = p.y - CY, pd = Math.hypot(pdx, pdy);
   if (pd < 66 && pd > .01) { p.x = CX + pdx / pd * 66; p.y = CY + pdy / pd * 66; }
+  followCam(dt);
 
   // kid auto fire
   const range = 175 + 14 * S.up.range, target = nearest(p.x, p.y, range);
@@ -667,12 +685,33 @@ function update(dt) {
   for (const f of floats) if (f.life > 0) { f.life -= dt; f.h += 24 * dt; }
 }
 
+/* ---------- camera ---------- */
+function followCam(dt) {
+  const p = S.player, k = dt === undefined ? 1 : 1 - Math.pow(.002, dt);
+  const tx = clamp(p.x - VW / 2, 0, W - VW), ty = clamp(p.y - VH * .58, 0, H - VH);
+  cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+}
+// small arrows on the screen edge pointing at babies the camera can't see
+function drawOffscreen() {
+  ctx.fillStyle = '#ff5d4a'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+  const m = 14, top = 58;
+  for (const b of ents.babies) {
+    if (b.state !== 'walk') continue;
+    const sx = b.x - cam.x, sy = b.y - 14 - cam.y;
+    if (sx > -4 && sx < VW + 4 && sy > top - 10 && sy < VH + 4) continue;
+    const x = clamp(sx, m, VW - m), y = clamp(sy, top + m, VH - m), a = Math.atan2(sy - y, sx - x);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-5, -6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.stroke(); ctx.fill();
+    ctx.restore();
+  }
+}
+
 /* ---------- drawing ---------- */
 const order = [];
 function render(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(bg, 0, 0);
-  ctx.setTransform(PX, 0, 0, PX, 0, 0);
+  ctx.drawImage(bg, cam.x * PX, cam.y * PX, cv.width, cv.height, 0, 0, cv.width, cv.height);
+  ctx.setTransform(PX, 0, 0, PX, -cam.x * PX, -cam.y * PX);
   drawSea(now);
   const p = S.player;
 
@@ -730,6 +769,8 @@ function render(now) {
     ctx.lineWidth = 3; ctx.strokeStyle = '#2a6b86'; ctx.strokeText(f.txt, f.x, f.y - f.h); ctx.fillStyle = '#fff'; ctx.fillText(f.txt, f.x, f.y - f.h);
   }
   ctx.globalAlpha = 1;
+  ctx.setTransform(PX, 0, 0, PX, 0, 0);
+  drawOffscreen();
 
   // DOM overlays
   $('shellChip').style.transform = S.bump > 0 ? 'scale(' + (1 + S.bump * .6) + ')' : '';

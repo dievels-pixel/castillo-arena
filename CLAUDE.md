@@ -14,7 +14,7 @@ Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en
 - `index.html`: página y capas de interfaz (marcador, carteles, fin de partida).
 - `css/style.css`: estilos.
 - `js/game.js`: todo el juego, en 2D con Canvas y dibujado con código (sin librerías ni compilación).
-  - Todo trabaja en "píxeles de playa" (360x640, 20 px = 1 m). Vista cenital inclinada fija: la altura se dibuja hacia arriba (y - h) y se pinta de atrás adelante ordenando por y.
+  - Todo trabaja en "píxeles de playa" (20 px = 1 m). La playa mide 600x760 y la pantalla enseña 360x640; la cámara (`cam`) sigue al niño. Vista cenital inclinada fija: la altura se dibuja hacia arriba (y - h) y se pinta de atrás adelante ordenando por y.
   - Datos ajustables: `TYPES` (bebés), `UPG` (mejoras), `WALL_COST`, `FRIEND_COST`, `PADS` (recuadros).
   - `update(dt)` simula, `render(now)` dibuja. El fondo estático se pinta una vez en `buildBg()`.
 
