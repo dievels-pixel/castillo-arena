@@ -2,10 +2,12 @@
 
 Defiende tu castillo de arena de una invasión de bebés a bolazos de arena.
 
+Juego 2D para móvil en vertical, dibujado con código en un canvas. No necesita instalación ni compilación.
+
 ## Cómo se juega
-- Arrastra el dedo para mover al niño (en ordenador, WASD o flechas). Dispara solo al bebé más cercano.
-- Los bebés se van llorando y sueltan conchas. Pasa cerca para recogerlas.
-- Colócate sobre un recuadro del suelo para gastar conchas: cadencia, daño, alcance, muralla, amigos y reparar.
+- Arrastra el dedo para mover al niño (en ordenador, WASD o flechas). La playa es más grande que la pantalla: muévete para ver por dónde vienen los bebés.
+- El niño dispara solo al bebé más cercano. Los bebés se van llorando y sueltan conchas.
+- Ponte encima de una casilla del suelo para pagar mejoras y construcciones con conchas.
 
 ## Cómo trabajar en el proyecto
 - Desde el móvil: claude.ai/code, elige este repositorio y pide el cambio en lenguaje normal.

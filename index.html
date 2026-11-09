@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b6b84">
 <title>Castillo de Arena</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,38 +11,9 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="shell" viewBox="0 0 24 24">
-    <path d="M12 22 L3.5 11 A9 9 0 0 1 20.5 11 Z" fill="#f7a8ba" stroke="#b85a76" stroke-width="1.6" stroke-linejoin="round"/>
-    <path d="M12 22 L8 6.5 M12 22 L12 4 M12 22 L16 6.5" stroke="#b85a76" stroke-width="1.2" fill="none"/>
-  </symbol>
-</svg>
-
-<div id="slot">
-  <div id="stage">
-    <div id="gl"></div>
-    <div id="fx"></div>
-    <div id="joy" hidden><i id="joyRing"></i><i id="joyKnob"></i></div>
-    <div id="hud">
-      <div class="chip" id="waveChip">Oleada <b id="waveNo">1</b></div>
-      <div class="chip hp"><span>Castillo</span><div class="bar"><i id="hpFill"></i></div></div>
-      <div class="chip" id="shellChip"><svg class="ic"><use href="#shell"/></svg><b id="shellNo">0</b></div>
-    </div>
-    <div id="banner"></div>
-    <div id="hint">Arrastra para mover al niño. Colócate sobre un recuadro para gastar conchas en mejoras.</div>
-    <div id="over" hidden>
-      <div class="card">
-        <h2>El castillo se ha derrumbado</h2>
-        <p id="overTxt"></p>
-        <button class="btn" id="again" type="button">Construir otro</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Motor 3D (three.js r128) desde CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<canvas id="game" aria-label="Playa con el castillo de arena"></canvas>
+<div id="hint">Arrastra el dedo para mover al niño</div>
+<script src="js/chars.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>
