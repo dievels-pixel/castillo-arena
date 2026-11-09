@@ -351,7 +351,7 @@ function padState(p) {
     const n = S.friends.length;
     if (n < 6) return { name: 'Amigos', val: 'Recluta ' + (n + 1) + ' de 6', lvl: f1(fRate()) + ' bolas/s', cost: FRIEND_COST[n], maxed: false, enabled: true };
     const l = S.friendLvl, maxed = l >= 6;
-    return { name: 'Entrenar', val: f1(fRate()) + ' bolas/s', lvl: 'Nivel ' + l + ' de 6', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: true };
+    return { name: 'Entrenar', val: f1(fRate()) + ' b/s · daño ' + f1(fDmg()), lvl: 'Nivel ' + l + ' de 6', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: true };
   }
   const hurt = S.hp < 100 || walls.some(w => w.built && w.hp < wallMax());
   return { name: 'Reparar', val: 'Castillo ' + Math.ceil(S.hp) + '/100', lvl: 'Recupera 35', cost: repairCost(), maxed: false, enabled: hurt };
