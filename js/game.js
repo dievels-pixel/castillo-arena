@@ -64,9 +64,9 @@ const bg = document.createElement('canvas'), bgx = bg.getContext('2d');
 function buildBg() {
   bg.width = Math.round(W * PX); bg.height = Math.round(H * PX);
   const t = bgx; t.setTransform(PX, 0, 0, PX, 0, 0);
-  t.fillStyle = '#27b3c7'; t.fillRect(0, 0, W, SEA_Y);
-  const g = t.createLinearGradient(0, SEA_Y - 8, 0, H); g.addColorStop(0, '#c9a869'); g.addColorStop(.06, '#e6cb8e'); g.addColorStop(1, '#f1dba6');
-  t.fillStyle = g; t.fillRect(0, SEA_Y - 8, W, H);
+  t.fillStyle = '#27b3c7'; t.fillRect(0, 0, W, SEA_Y - 14);
+  const g = t.createLinearGradient(0, SEA_Y - 14, 0, H); g.addColorStop(0, '#c4a263'); g.addColorStop(.07, '#e6cb8e'); g.addColorStop(1, '#f1dba6');
+  t.fillStyle = g; t.fillRect(0, SEA_Y - 14, W, H);
   let s = 20261109; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 2400; i++) {
     t.fillStyle = r() < .5 ? 'rgba(150,110,50,.16)' : 'rgba(255,248,222,.45)';
@@ -98,16 +98,21 @@ function buildBg() {
   // castle mound
   t.fillStyle = '#d6ae66'; t.beginPath(); t.ellipse(CX, CY + 4, 92, 30, 0, 0, TAU); t.fill();
 }
+// The shoreline undulates along the beach and moves with time (two waves of different length).
+const shoreY = (x, t) => SEA_Y + Math.sin(x * .012 + t * .8) * 7 + Math.sin(x * .031 - t * 1.3) * 3.5;
 function drawSea(now) {
-  const wv = Math.sin(now * 1.4) * 4, y0 = SEA_Y + wv;
-  const g = ctx.createLinearGradient(0, 0, 0, y0); g.addColorStop(0, '#138aa3'); g.addColorStop(1, '#2fc0d2');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, y0);
+  const x0 = Math.max(0, Math.floor(cam.x / 12) * 12 - 12), x1 = Math.min(W, cam.x + VW + 24);
+  const g = ctx.createLinearGradient(0, 0, 0, SEA_Y + 10); g.addColorStop(0, '#138aa3'); g.addColorStop(1, '#2fc0d2');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x1, 0);
+  for (let x = x1; x >= x0; x -= 12) ctx.lineTo(x, shoreY(x, now));
+  ctx.closePath(); ctx.fill();
+  // foam: a bright band on the edge and a fainter wave a little further out
   for (let k = 0; k < 2; k++) {
-    const ph = now * 2 + k * 1.7, yy = y0 - k * 7;
-    ctx.beginPath(); ctx.moveTo(0, yy - 3);
-    for (let x = 0; x <= W; x += 20) ctx.lineTo(x, yy + Math.sin(x * .05 + ph) * 2);
-    for (let x = W; x >= 0; x -= 20) ctx.lineTo(x, yy - 3 + Math.sin(x * .05 + ph + 1) * 1.5);
-    ctx.closePath(); ctx.fillStyle = k ? 'rgba(243,251,247,.45)' : 'rgba(243,251,247,.85)'; ctx.fill();
+    const off = k * 9, th = k ? 2.5 : 4, t2 = now - k * .6;
+    ctx.beginPath();
+    for (let x = x0; x <= x1; x += 12) ctx.lineTo(x, shoreY(x, t2) - off - th);
+    for (let x = x1; x >= x0; x -= 12) ctx.lineTo(x, shoreY(x, t2) - off + (k ? 0 : 1.5));
+    ctx.closePath(); ctx.fillStyle = k ? 'rgba(243,251,247,.45)' : 'rgba(243,251,247,.9)'; ctx.fill();
   }
 }
 
