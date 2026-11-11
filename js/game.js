@@ -14,7 +14,7 @@ const TAU = Math.PI * 2;
 const VW = 360, VH = 640;                 // what the screen shows
 const W = 600, H = 760;                   // the whole beach; the camera follows the kid
 const CX = 300, CY = 440, CR = 62;        // castle centre and its attack radius
-const WALL_R = 112, HOLE_R = 84;          // wall arc radius and friends' holes radius
+const HOLE_R = 84;                        // friends' holes radius
 const SEA_Y = 56;                         // shoreline
 
 /* ---------- canvas sizing ---------- */
@@ -159,32 +159,7 @@ function drawCastle(now) {
   ctx.restore();
 }
 
-/* ---------- wall segments (built from the pad) ---------- */
-const walls = [];
-for (let i = 0; i < 5; i++) walls.push({ a: -Math.PI + (i + .5) * Math.PI / 5, built: false, hp: 0, shake: 0 });
-const WALL_ORDER = [2, 1, 3, 0, 4];
-const WALL_COST = [15, 22, 30, 40, 52];
 const FRIEND_COST = [20, 30, 45, 65, 90, 120];
-const wallMax = () => 60 + 40 * S.wallLvl;
-function drawWall(w, now) {
-  const a0 = w.a - Math.PI / 10 + .035, a1 = w.a + Math.PI / 10 - .035, ri = WALL_R - 8, ro = WALL_R + 8;
-  if (!w.built && S.wallBuilt < 5 && walls[WALL_ORDER[S.wallBuilt]] === w) return;   // its pad is drawn there instead
-  if (!w.built || w.hp <= 0) {
-    ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.4)';
-    ctx.beginPath(); ctx.arc(CX, CY, ro, a0, a1); ctx.arc(CX, CY, ri, a1, a0, true); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
-    return;
-  }
-  const f = clamp(w.hp / wallMax(), 0, 1), h = 18 * (.55 + .45 * f), sx = w.shake > 0 ? Math.sin(now * 80) * w.shake * 6 : 0;
-  ctx.save(); ctx.translate(sx, 0);
-  ctx.fillStyle = 'rgba(90,60,20,.18)'; ctx.beginPath(); ctx.arc(CX, CY + 3, ro, a0, a1); ctx.arc(CX, CY + 3, ri, a1, a0, true); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = SAND_D; ctx.beginPath(); ctx.arc(CX, CY, ri, a0, a1); ctx.arc(CX, CY - h, ri, a1, a0, true); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = SAND_L; ctx.beginPath(); ctx.arc(CX, CY - h, ro, a0, a1); ctx.arc(CX, CY - h, ri, a1, a0, true); ctx.closePath(); ctx.fill();
-  for (let k = 0; k < 3; k++) {
-    const a = a0 + (k + .5) * (a1 - a0) / 3, x = CX + Math.cos(a) * WALL_R, y = CY - h + Math.sin(a) * WALL_R;
-    ctx.fillStyle = SAND; ctx.fillRect(x - 4, y - 6, 8, 6); ctx.fillStyle = SAND_L; ctx.fillRect(x - 4, y - 8, 8, 2.5);
-  }
-  ctx.restore();
-}
 
 /* ---------- characters ---------- */
 // The kid (and friends): older child, three-quarter view, faces left or right.
@@ -356,7 +331,6 @@ function sfx(name) {
     case 'wave': tone('triangle', 392, 392, .14, .16); tone('triangle', 523, 523, .22, .16, .13); break;
     case 'clear': [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f, .14, .14, i * .08)); break;
     case 'castle': tone('sine', 95, 50, .2, .35); noise(.12, .1, 300, 'lowpass'); break;
-    case 'crumble': noise(.35, .25, 450, 'lowpass'); break;
     case 'over': [392, 330, 262].forEach((f, i) => tone('triangle', f, f * .97, .32, .18, i * .3)); break;
   }
 }
@@ -384,18 +358,15 @@ const fRate = () => .7 + .12 * S.friendLvl, fDmg = () => 1.5 + .5 * S.friendLvl,
 
 const PADS = [
   { id: 'rate',   x: CX - 118, y: 540 }, { id: 'power',  x: CX, y: 540 }, { id: 'range',  x: CX + 118, y: 540 },
-  { id: 'wall',   x: CX - 118, y: 618 }, { id: 'friend', x: CX + 118, y: 618 }, { id: 'repair', x: CX, y: 618 }
+  { id: 'friend', x: CX - 59, y: 618 }, { id: 'repair', x: CX + 59, y: 618 }
 ];
 const PAD_W = 70, SITE_W = 56, FRIEND_SITE_R = 175;
-// Upgrades live in the shop by the castle. Constructions (wall, friends) are paid on the spot where they will be
+// Upgrades live in the shop by the castle. Friends are paid on the spot where they will be
 // built; once all are built, their pad (Refuerzo / Entrenar) moves to its shop slot.
 function placePads() {
   for (const p of padObjs) {
     p.w = PAD_W; p.x = p.hx; p.y = p.hy;
-    if (p.id === 'wall' && S.wallBuilt < 5) {
-      const w = walls[WALL_ORDER[S.wallBuilt]];
-      p.w = SITE_W; p.x = CX + Math.cos(w.a) * WALL_R; p.y = CY + Math.sin(w.a) * WALL_R;
-    } else if (p.id === 'friend' && S.friends.length < 6) {
+    if (p.id === 'friend' && S.friends.length < 6) {
       const h = holes[S.friends.length], a = Math.atan2(h.y - CY, h.x - CX);
       p.w = SITE_W; p.x = CX + Math.cos(a) * FRIEND_SITE_R; p.y = CY + Math.sin(a) * FRIEND_SITE_R;
     }
@@ -412,32 +383,22 @@ function padState(p) {
     const u = UPG[id], l = S.up[id], maxed = l >= u.max;
     return { name: u.name, val: u.fmt(u.val(l)), lvl: 'Nivel ' + l + ' de ' + u.max, cost: maxed ? 0 : upCost(u, l), maxed, enabled: true };
   }
-  if (id === 'wall') {
-    const n = S.wallBuilt;
-    if (n < 5) return { name: 'Muralla', val: 'Tramo ' + (n + 1) + ' de 5', lvl: 'Aguanta ' + wallMax(), cost: WALL_COST[n], maxed: false, enabled: true };
-    const l = S.wallLvl, maxed = l >= 5;
-    return { name: 'Refuerzo', val: 'Aguanta ' + wallMax(), lvl: 'Nivel ' + l + ' de 5', cost: maxed ? 0 : Math.ceil(20 * Math.pow(1.5, l)), maxed, enabled: true };
-  }
   if (id === 'friend') {
     const n = S.friends.length;
     if (n < 6) return { name: 'Amigos', val: 'Recluta ' + (n + 1) + ' de 6', lvl: f1(fRate()) + ' bolas/s', cost: FRIEND_COST[n], maxed: false, enabled: true };
     const l = S.friendLvl, maxed = l >= 6;
     return { name: 'Entrenar', val: f1(fRate()) + ' b/s · daño ' + f1(fDmg()), lvl: 'Nivel ' + l + ' de 6', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: true };
   }
-  const hurt = S.hp < 100 || walls.some(w => w.built && w.hp < wallMax());
+  const hurt = S.hp < 100;
   return { name: 'Reparar', val: 'Castillo ' + Math.ceil(S.hp) + '/100', lvl: 'Recupera 35', cost: repairCost(), maxed: false, enabled: hurt };
 }
 function completePad(p) {
   const id = p.id;
   if (id === 'rate' || id === 'power' || id === 'range') S.up[id]++;
-  else if (id === 'wall') {
-    if (S.wallBuilt < 5) { const w = walls[WALL_ORDER[S.wallBuilt]]; w.built = true; w.hp = wallMax(); S.wallBuilt++; puff(CX + Math.cos(w.a) * WALL_R, CY + Math.sin(w.a) * WALL_R, 14, 14, '#e8c680'); }
-    else { S.wallLvl++; walls.forEach(w => { if (w.built) w.hp = Math.min(wallMax(), w.hp + 40); }); }
-  } else if (id === 'friend') {
+  else if (id === 'friend') {
     if (S.friends.length < 6) recruit(); else S.friendLvl++;
   } else {
     S.hp = Math.min(100, S.hp + 35);
-    walls.forEach(w => { if (w.built) w.hp = Math.min(wallMax(), w.hp + .35 * wallMax()); });
   }
   p.prog = 0; p.acc = 0; p.key = ''; updateHud();
   puff(p.x, p.y, 6, 16, '#fff3b0'); sfx('buy');
@@ -478,12 +439,11 @@ const KID_LOOK = { skin: '#f0b48a', skinD: '#d9976a', trunk: '#2c6fe0', hat: 'st
 
 function newGame() {
   ents.babies = []; ents.balls = []; ents.drops = []; ents.flies = [];
-  walls.forEach(w => { w.built = false; w.hp = 0; });
   padObjs.forEach(p => { p.prog = 0; p.acc = 0; p.key = ''; });
   S = {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
     over: false, shake: 0, bump: 0, hint: 9, activePad: null,
-    up: { rate: 0, power: 0, range: 0 }, wallBuilt: 0, wallLvl: 0, friends: [], friendLvl: 0,
+    up: { rate: 0, power: 0, range: 0 }, friends: [], friendLvl: 0,
     player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
   startWave(1); updateHud(); followCam(); placePads();
@@ -580,7 +540,7 @@ function spawnBaby() {
   const skin = SKINS[Math.floor(Math.random() * SKINS.length)];
   ents.babies.push({ type, x, y, hp: T.hp * hs, max: T.hp * hs, sp: T.sp * (.9 + Math.random() * .2), r: T.r,
     skin, skinD: darken(skin), hair: Math.floor(Math.random() * 4), hairC: HAIRS[Math.floor(Math.random() * HAIRS.length)],
-    state: 'walk', flash: 0, t: Math.random() * 6, atkT: Math.random() * .5, rate: T.rate, atk: T.atk, cryT: 0, fx: 0, fy: 0, inside: false });
+    state: 'walk', flash: 0, t: Math.random() * 6, atkT: Math.random() * .5, rate: T.rate, atk: T.atk, cryT: 0, fx: 0, fy: 0 });
 }
 function darken(hex) {
   const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(x => Math.round(x * .82));
@@ -603,11 +563,6 @@ function hitCastle(d) {
   S.hp = Math.max(0, S.hp - d); S.shake = .25; sfx('castle');
   puff(CX + rnd(-40, 40), CY + 8, 30, 3, '#d9b873'); updateHud();
   if (S.hp <= 0) gameOver();
-}
-function hitWall(w, d) {
-  const x = CX + Math.cos(w.a) * WALL_R, y = CY + Math.sin(w.a) * WALL_R;
-  w.hp -= d; w.shake = .2; puff(x, y, 18, 3, '#d9b873');
-  if (w.hp <= 0) { w.hp = 0; sfx('crumble'); puff(x, y, 14, 12, '#d9b873'); }
 }
 function nearest(x, y, range) {
   let t = null, bd = 1e9;
@@ -691,16 +646,7 @@ function update(dt) {
     b.t += dt; b.flash = Math.max(0, b.flash - dt);
     if (b.state === 'walk') {
       const dx = CX - b.x, dy = CY - b.y, d = Math.hypot(dx, dy) || 1;
-      let blocked = null;
-      if (b.y < CY && !b.inside) {
-        if (d < WALL_R - 12) b.inside = true;
-        else if (d <= WALL_R + b.r * .5) {
-          const ang = Math.atan2(b.y - CY, b.x - CX), idx = clamp(Math.floor((ang + Math.PI) / (Math.PI / 5)), 0, 4), sg = walls[idx];
-          if (sg.built && sg.hp > 0) blocked = sg;
-        }
-      }
-      if (blocked) { b.atkT -= dt; if (b.atkT <= 0) { b.atkT = b.rate; hitWall(blocked, b.atk); } }
-      else if (d > CR + b.r * .3) { const m = b.sp * dt; b.x += dx / d * m; b.y += dy / d * m; }
+      if (d > CR + b.r * .3) { const m = b.sp * dt; b.x += dx / d * m; b.y += dy / d * m; }
       else { b.atkT -= dt; if (b.atkT <= 0) { b.atkT = b.rate; hitCastle(b.atk); if (S.over) return; } }
     } else {
       b.cryT += dt; b.x += b.fx * 110 * dt; b.y += b.fy * 110 * dt;
@@ -748,7 +694,6 @@ function update(dt) {
     if (f.t >= 1) ents.flies.splice(i, 1);
   }
 
-  for (const w of walls) w.shake = Math.max(0, w.shake - dt);
 
   // waves
   if (S.spawnLeft > 0) {
@@ -820,14 +765,12 @@ function render(now) {
   // standing things, back to front
   order.length = 0;
   order.push({ y: CY + 16, k: 0 });
-  for (const w of walls) order.push({ y: CY + Math.sin(w.a) * WALL_R + 6, k: 1, o: w });
   for (const f of S.friends) order.push({ y: f.y, k: 2, o: f });
   for (const b of ents.babies) order.push({ y: b.y, k: 3, o: b });
   order.push({ y: p.y, k: 4 });
   order.sort((a, b) => a.y - b.y);
   for (const e of order) {
     if (e.k === 0) drawCastle(now);
-    else if (e.k === 1) drawWall(e.o, now);
     else if (e.k === 2) drawFriend(e.o, now);
     else if (e.k === 3) drawBaby(e.o);
     else drawKid(p.x, p.y, Object.assign(KID_LOOK, { aim: p.aim, moving: p.moving, walk: p.walk, kick: p.kick }));
