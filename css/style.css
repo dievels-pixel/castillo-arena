@@ -55,3 +55,21 @@ body{
 .btn{font:700 1.7em var(--display);color:#fff;background:var(--coral);border:0;border-radius:99em;padding:.45em 1em;box-shadow:0 .18em 0 var(--coral-dark);cursor:pointer}
 .btn:active{transform:translateY(.1em);box-shadow:0 .08em 0 var(--coral-dark)}
 button:focus-visible{outline:.15em solid #fff;outline-offset:.15em}
+
+.shopbtn{position:absolute;right:1em;bottom:1.2em;display:flex;align-items:center;gap:.35em;font:700 1.8em var(--display);color:#fff;background:var(--coral);border:0;border-radius:99em;padding:.5em .9em;box-shadow:0 .18em 0 var(--coral-dark);cursor:pointer}
+.shopbtn .ic{width:1.1em;height:1.1em}
+.shopbtn.ready{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08)}}
+.card.shop{width:100%;max-width:30em;max-height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:1.3em 1.1em}
+.card.shop h2{margin-bottom:.2em}
+.shop .have{display:flex;align-items:center;justify-content:center;gap:.3em;font-family:var(--display);color:var(--ink)}
+#shopList{overflow:auto;margin:0 0 1em;display:flex;flex-direction:column;gap:.6em}
+.item{display:flex;align-items:center;gap:.8em;background:#f6e6bd;border-radius:1em;padding:.7em .9em;text-align:left}
+.item .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15em}
+.item b{font:700 1.6em/1.1 var(--display);color:var(--ink)}
+.item span{font-size:1.3em;font-weight:800;color:#6b4e2a}
+.item small{font-size:1.1em;font-weight:700;color:#8a7350}
+.buy{flex:none;display:flex;align-items:center;gap:.3em;font:700 1.6em var(--display);color:#fff;background:#2fb86a;border:0;border-radius:99em;padding:.4em .8em;box-shadow:0 .15em 0 #1f8a4d;cursor:pointer}
+.buy:disabled{background:#c9b88f;box-shadow:none;cursor:default}
+.buy .ic{width:1em;height:1em}
+.item .max{font:700 1.4em var(--display);color:#7d765f}

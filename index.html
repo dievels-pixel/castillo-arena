@@ -28,16 +28,25 @@
       <div class="chip" id="shellChip"><svg class="ic"><use href="#shell"/></svg><b id="shellNo">0</b></div>
       <button class="round" id="pauseBtn" type="button" aria-label="Pausa"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
     </div>
+    <button class="shopbtn" id="shopBtn" type="button"><svg class="ic"><use href="#shell"/></svg>Mejoras</button>
     <div id="banner"></div>
-    <div id="hint">Arrastra para mover al niño. Colócate sobre un recuadro para gastar conchas en mejoras.</div>
+    <div id="hint">Arrastra para mover al niño. Pulsa Mejoras para gastar las conchas.</div>
     <div id="start" class="layer">
       <div class="card">
         <h1>Castillo de Arena</h1>
         <p>Los bebés vienen a destrozar tu castillo. Tu niño les tira bolas de arena él solo: tú muévelo arrastrando el dedo.</p>
-        <p>Recoge las conchas que sueltan y gástalas poniéndote encima de los recuadros.</p>
+        <p>Recoge las conchas que sueltan y gástalas con el botón Mejoras.</p>
         <p class="rec" id="startRec" hidden></p>
         <button class="btn" id="play" type="button">Jugar</button>
         <button class="btn ghost snd" type="button">Sonido: sí</button>
+      </div>
+    </div>
+    <div id="shop" class="layer" hidden>
+      <div class="card shop">
+        <h2>Mejoras</h2>
+        <p class="have">Tienes <svg class="ic"><use href="#shell"/></svg> <b id="shopShells">0</b></p>
+        <div id="shopList"></div>
+        <button class="btn" id="shopClose" type="button">Volver a jugar</button>
       </div>
     </div>
     <div id="paused" class="layer" hidden>

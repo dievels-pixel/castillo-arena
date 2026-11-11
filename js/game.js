@@ -356,97 +356,64 @@ const upCost = (u, l) => Math.ceil(u.base * Math.pow(u.g, l));
 const repairCost = () => 5 + 2 * S.wave;
 const fRate = () => .7 + .12 * S.friendLvl, fDmg = () => 1.5 + .5 * S.friendLvl, F_RANGE = 150;
 
-const PADS = [
-  { id: 'rate',   x: CX - 118, y: 540 }, { id: 'power',  x: CX, y: 540 }, { id: 'range',  x: CX + 118, y: 540 },
-  { id: 'friend', x: CX - 59, y: 618 }, { id: 'repair', x: CX + 59, y: 618 }
-];
-const PAD_W = 70, SITE_W = 56, FRIEND_SITE_R = 175;
-// Upgrades live in the shop by the castle. Friends are paid on the spot where they will be
-// built; once all are built, their pad (Refuerzo / Entrenar) moves to its shop slot.
-function placePads() {
-  for (const p of padObjs) {
-    p.w = PAD_W; p.x = p.hx; p.y = p.hy;
-    if (p.id === 'friend' && S.friends.length < 6) {
-      const h = holes[S.friends.length], a = Math.atan2(h.y - CY, h.x - CX);
-      p.w = SITE_W; p.x = CX + Math.cos(a) * FRIEND_SITE_R; p.y = CY + Math.sin(a) * FRIEND_SITE_R;
-    }
-  }
-}
-
 const cam = { x: CX - VW / 2, y: 0 };
-let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause
+let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause | shop
 try { best = +localStorage.getItem('castillo-arena-best') || 0; bestKills = +localStorage.getItem('castillo-arena-best-kills') || 0; } catch (e) {}
 
-function padState(p) {
-  const id = p.id;
-  if (id === 'rate' || id === 'power' || id === 'range') {
+/* ---------- upgrades menu (Mejoras button); the game waits while it is open ---------- */
+const SHOP = ['rate', 'power', 'range', 'friend', 'train', 'repair'];
+const amigos = n => n + (n === 1 ? ' amigo' : ' amigos');
+function itemState(id) {
+  if (UPG[id]) {
     const u = UPG[id], l = S.up[id], maxed = l >= u.max;
-    return { name: u.name, val: u.fmt(u.val(l)), lvl: 'Nivel ' + l + ' de ' + u.max, cost: maxed ? 0 : upCost(u, l), maxed, enabled: true };
+    return { name: u.name, now: u.fmt(u.val(l)), next: maxed ? '' : u.fmt(u.val(l + 1)), note: 'Nivel ' + l + ' de ' + u.max, cost: maxed ? 0 : upCost(u, l), maxed, enabled: true };
   }
   if (id === 'friend') {
-    const n = S.friends.length;
-    if (n < 6) return { name: 'Amigos', val: 'Recluta ' + (n + 1) + ' de 6', lvl: f1(fRate()) + ' bolas/s', cost: FRIEND_COST[n], maxed: false, enabled: true };
-    const l = S.friendLvl, maxed = l >= 6;
-    return { name: 'Entrenar', val: f1(fRate()) + ' b/s · daño ' + f1(fDmg()), lvl: 'Nivel ' + l + ' de 6', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: true };
+    const n = S.friends.length, maxed = n >= 6;
+    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Disparan solos desde un agujero', cost: maxed ? 0 : FRIEND_COST[n], maxed, enabled: true };
+  }
+  if (id === 'train') {
+    const l = S.friendLvl, maxed = l >= 6, has = S.friends.length > 0, fmt = k => f1(.7 + .12 * k) + ' b/s · daño ' + f1(1.5 + .5 * k);
+    return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de 6, para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: has };
   }
   const hurt = S.hp < 100;
-  return { name: 'Reparar', val: 'Castillo ' + Math.ceil(S.hp) + '/100', lvl: 'Recupera 35', cost: repairCost(), maxed: false, enabled: hurt };
+  return { name: 'Reparar castillo', now: Math.ceil(S.hp) + '/100', next: hurt ? Math.min(100, Math.ceil(S.hp) + 35) + '/100' : '', note: hurt ? 'Recupera 35' : 'Está entero', cost: repairCost(), maxed: false, enabled: hurt };
 }
-function completePad(p) {
-  const id = p.id;
-  if (id === 'rate' || id === 'power' || id === 'range') S.up[id]++;
-  else if (id === 'friend') {
-    if (S.friends.length < 6) recruit(); else S.friendLvl++;
-  } else {
-    S.hp = Math.min(100, S.hp + 35);
-  }
-  p.prog = 0; p.acc = 0; p.key = ''; updateHud();
-  puff(p.x, p.y, 6, 16, '#fff3b0'); sfx('buy');
+const affordable = id => { const st = itemState(id); return !st.maxed && st.enabled && S.shells >= st.cost; };
+function buy(id) {
+  if (!affordable(id)) return;
+  S.shells -= itemState(id).cost;
+  if (UPG[id]) S.up[id]++;
+  else if (id === 'friend') recruit();
+  else if (id === 'train') S.friendLvl++;
+  else S.hp = Math.min(100, S.hp + 35);
+  updateHud(); sfx('buy'); puff(S.player.x, S.player.y, 30, 14, '#fff3b0'); drawShop();
 }
-
-/* ---------- pads (flat squares on the sand); each label is cached on its own small canvas ---------- */
-const padObjs = [];
-PADS.forEach(p => {
-  const c = document.createElement('canvas'); c.width = c.height = 192;
-  p.cv = c; p.prog = 0; p.acc = 0; p.key = ''; p.hx = p.x; p.hy = p.y; p.w = PAD_W;
-  padObjs.push(p);
-});
-function drawPad(p, st, active, can) {
-  const t = p.cv.getContext('2d'); t.clearRect(0, 0, 192, 192);
-  t.fillStyle = active ? 'rgba(255,250,224,.97)' : 'rgba(255,248,226,.86)'; rr(t, 8, 8, 176, 176, 24); t.fill();
-  t.lineWidth = 8; t.strokeStyle = st.maxed || !st.enabled ? '#a39d8c' : (can ? '#2fb86a' : '#b07f35'); t.stroke();
-  t.textAlign = 'center'; t.textBaseline = 'middle';
-  t.fillStyle = '#3b2814'; t.font = '700 27px Fredoka, "Trebuchet MS", sans-serif'; t.fillText(st.name, 96, 40);
-  t.fillStyle = '#6b4e2a'; t.font = '800 17px Nunito, system-ui, sans-serif'; t.fillText(st.val, 96, 66);
-  if (st.maxed || !st.enabled) {
-    t.fillStyle = '#7d765f'; t.font = '700 27px Fredoka, sans-serif'; t.fillText(st.maxed ? 'Máximo' : 'Todo bien', 96, 112);
-  } else {
-    const txt = p.prog + '/' + st.cost; t.font = '700 36px Fredoka, sans-serif';
-    const w = t.measureText(txt).width, tot = w + 38, s0 = 96 - tot / 2;
-    t.fillStyle = '#f7a8ba'; t.strokeStyle = '#b85a76'; t.lineWidth = 2.5; t.beginPath();
-    t.moveTo(s0 + 14, 126); t.lineTo(s0 + 2, 110); t.arc(s0 + 14, 110, 12, Math.PI, 0); t.closePath(); t.fill(); t.stroke();
-    t.fillStyle = '#3b2814'; t.textAlign = 'left'; t.fillText(txt, s0 + 38, 114); t.textAlign = 'center';
-    t.fillStyle = '#e3d2a4'; rr(t, 26, 136, 140, 14, 7); t.fill();
-    if (p.prog > 0) { t.fillStyle = '#2fb86a'; rr(t, 26, 136, Math.max(14, 140 * p.prog / st.cost), 14, 7); t.fill(); }
-  }
-  t.fillStyle = '#6b4e2a'; t.font = '700 15px Nunito, system-ui, sans-serif'; t.fillText(st.lvl, 96, 166);
+const SHELL_SVG = '<svg class="ic"><use href="#shell"/></svg>';
+function drawShop() {
+  $('shopShells').textContent = S.shells;
+  $('shopList').innerHTML = SHOP.map(id => {
+    const st = itemState(id);
+    const act = st.maxed ? '<span class="max">Máximo</span>'
+      : '<button class="buy" type="button" data-id="' + id + '"' + (affordable(id) ? '' : ' disabled') + '>' + SHELL_SVG + st.cost + '</button>';
+    return '<div class="item"><div class="info"><b>' + st.name + '</b><span>' + st.now + (st.next ? ' → ' + st.next : '') + '</span><small>' + st.note + '</small></div>' + act + '</div>';
+  }).join('');
 }
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => padObjs.forEach(p => { p.key = ''; }));
+$('shopList').addEventListener('click', e => { const b = e.target.closest('.buy'); if (b) buy(b.dataset.id); });
 
 /* ---------- state ---------- */
-const ents = { babies: [], balls: [], drops: [], flies: [] };
+const ents = { babies: [], balls: [], drops: [] };
 const KID_LOOK = { skin: '#f0b48a', skinD: '#d9976a', trunk: '#2c6fe0', hat: 'straw', s: 1.1 };
 
 function newGame() {
-  ents.babies = []; ents.balls = []; ents.drops = []; ents.flies = [];
-  padObjs.forEach(p => { p.prog = 0; p.acc = 0; p.key = ''; });
+  ents.babies = []; ents.balls = []; ents.drops = [];
   S = {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
-    over: false, shake: 0, bump: 0, hint: 9, activePad: null,
+    over: false, shake: 0, bump: 0, hint: 9,
     up: { rate: 0, power: 0, range: 0 }, friends: [], friendLvl: 0,
     player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
-  startWave(1); updateHud(); followCam(); placePads();
+  startWave(1); updateHud(); followCam();
 }
 function startWave(n) {
   S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; S.bannerTxt = 'Oleada ' + n; sfx('wave');
@@ -508,13 +475,26 @@ function pause() {
   $('pauseTxt').textContent = 'Oleada ' + S.wave + ' · ' + S.kills + (S.kills === 1 ? ' bebé' : ' bebés') + ' llorando';
   $('paused').hidden = false;
 }
+function openShop() {
+  if (mode !== 'play' || S.over) return;
+  mode = 'shop'; joy.on = false; joy.vx = joy.vy = 0; joyDom(); keys.clear();
+  drawShop(); $('shop').hidden = false;
+}
+function closeShop() { if (mode === 'shop') { mode = 'play'; $('shop').hidden = true; } }
+$('shopBtn').addEventListener('click', () => { audioOn(); openShop(); });
+$('shopClose').addEventListener('click', closeShop);
 function resume() { audioOn(); if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
 $('play').addEventListener('click', () => { audioOn(); $('start').hidden = true; newGame(); mode = 'play'; });
 $('pauseBtn').addEventListener('click', () => (mode === 'pause' ? resume() : pause()));
 $('resume').addEventListener('click', resume);
 $('quit').addEventListener('click', () => { newGame(); showStart(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause()); });
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (mode === 'shop') { if (k === 'escape' || k === 'm') closeShop(); return; }
+  if (k === 'm') openShop();
+  else if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause());
+});
 
 const bebes = n => n + (n === 1 ? ' bebé' : ' bebés');
 function gameOver() {
@@ -673,28 +653,6 @@ function update(dt) {
     if (d < 14 && s.t > .25) { S.shells += s.v; S.bump = .25; sfx('pick'); ents.drops.splice(i, 1); updateHud(); }
   }
 
-  // pads: stand on one to pay into it
-  S.activePad = null; placePads();
-  for (const pad of padObjs) if (Math.abs(p.x - pad.x) < pad.w / 2 && Math.abs(p.y - pad.y) < pad.w / 2) { S.activePad = pad; break; }
-  const ap = S.activePad;
-  if (ap) {
-    const st = padState(ap);
-    if (!st.maxed && st.enabled && S.shells > 0) {
-      ap.acc += clamp(st.cost * 1.5, 12, 40) * dt;
-      const n = Math.min(Math.floor(ap.acc), S.shells, st.cost - ap.prog);
-      if (n > 0) {
-        ap.acc -= n; S.shells -= n; ap.prog += n; updateHud(); sfx('pay');
-        for (let k = 0; k < Math.min(n, 2); k++) ents.flies.push({ t: 0, sx: p.x, sy: p.y, tx: ap.x, ty: ap.y });
-      }
-      if (ap.prog >= st.cost) completePad(ap);
-    }
-  }
-  for (let i = ents.flies.length - 1; i >= 0; i--) {
-    const f = ents.flies[i]; f.t += dt / .35;
-    if (f.t >= 1) ents.flies.splice(i, 1);
-  }
-
-
   // waves
   if (S.spawnLeft > 0) {
     S.spawnT -= dt;
@@ -738,18 +696,6 @@ function render(now) {
   drawSea(now);
   const p = S.player;
 
-  // pads
-  for (const pad of padObjs) {
-    const st = padState(pad), active = S.activePad === pad;
-    const can = !st.maxed && st.enabled && S.shells >= Math.max(1, st.cost - pad.prog) && st.cost > 0;
-    const key = [st.name, st.val, st.lvl, st.cost, pad.prog, st.maxed, st.enabled, active, can].join('|');
-    if (key !== pad.key) { pad.key = key; drawPad(pad, st, active, can); }
-    const k = (can ? 1 + Math.sin(now * 6) * .03 : 1) * pad.w / PAD_W, s = 35 * k;
-    ctx.fillStyle = '#cdb47a'; rr(ctx, pad.x - s, pad.y - s + 3, s * 2, s * 2, 10 * k); ctx.fill();
-    ctx.fillStyle = '#f3e3b5'; rr(ctx, pad.x - s, pad.y - s, s * 2, s * 2, 10 * k); ctx.fill();
-    ctx.drawImage(pad.cv, pad.x - 33 * k, pad.y - 33 * k, 66 * k, 66 * k);
-  }
-
   // shadows on the sand
   ctx.fillStyle = 'rgba(90,60,20,.22)';
   ell(p.x, p.y, 10, 3.6); ctx.fill();
@@ -778,10 +724,6 @@ function render(now) {
 
   // things in the air
   for (const bl of ents.balls) { ctx.fillStyle = '#b78a4b'; ell(bl.x, bl.y - 20, 3.6, 3.6); ctx.fill(); ctx.fillStyle = 'rgba(255,240,200,.6)'; ell(bl.x - 1.1, bl.y - 21.2, 1.2, 1.2); ctx.fill(); }
-  for (const f of ents.flies) {
-    const t = f.t, e = t * t * (3 - 2 * t);
-    shellIcon(f.sx + (f.tx - f.sx) * e, f.sy + (f.ty - f.sy) * e - 24 - Math.sin(t * Math.PI) * 28, 4.5);
-  }
   for (const q of parts) if (q.life > 0) { ctx.globalAlpha = clamp(q.life / .3, 0, 1); ctx.fillStyle = q.c; ctx.fillRect(q.x - 1.2, q.y - q.h - 1.2, 2.4, 2.4); }
   ctx.globalAlpha = 1;
   ctx.font = '700 15px Fredoka, "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
@@ -794,6 +736,8 @@ function render(now) {
   drawOffscreen();
 
   // DOM overlays
+  const ready = mode === 'play' && !S.over && SHOP.some(affordable), sb = $('shopBtn');
+  if (sb.classList.contains('ready') !== ready) sb.classList.toggle('ready', ready);
   $('shellChip').style.transform = S.bump > 0 ? 'scale(' + (1 + S.bump * .6) + ')' : '';
   const bn = $('banner');
   if (S.banner > 0 && !S.over && mode === 'play') { const a = Math.min(1, S.banner / .5); bn.textContent = S.bannerTxt; bn.style.opacity = a; bn.style.transform = 'scale(' + (1 + (1 - a) * .15) + ')'; } else bn.style.opacity = 0;
