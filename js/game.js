@@ -14,7 +14,6 @@ const TAU = Math.PI * 2;
 const VW = 360, VH = 640;                 // what the screen shows
 const W = 600, H = 760;                   // the whole beach; the camera follows the kid
 const CX = 300, CY = 440, CR = 62;        // castle centre and its attack radius
-const HOLE_R = 84;                        // friends' holes radius
 const SEA_Y = 56;                         // shoreline
 
 /* ---------- canvas sizing ---------- */
@@ -60,13 +59,8 @@ function conchIcon(x, y, s, spin) {
   ctx.restore();
 }
 
-/* ---------- static background (sand, rocks, holes) pre-drawn once per resize ---------- */
+/* ---------- static background (sand, rocks) pre-drawn once per resize ---------- */
 const bg = document.createElement('canvas'), bgx = bg.getContext('2d');
-const holes = [];
-for (let j = 0; j < 6; j++) {
-  const a = -Math.PI + (j + .5) * Math.PI / 6;
-  holes.push({ x: CX + Math.cos(a) * HOLE_R, y: CY + Math.sin(a) * HOLE_R });
-}
 function buildBg() {
   bg.width = Math.round(W * PX); bg.height = Math.round(H * PX);
   const t = bgx; t.setTransform(PX, 0, 0, PX, 0, 0);
@@ -85,10 +79,6 @@ function buildBg() {
     t.fillStyle = k % 2 ? '#8f8372' : '#a99a86';
     t.beginPath(); t.moveTo(x - z * 1.2, y); t.lineTo(x - z * .7, y - z * .9); t.lineTo(x + z * .3, y - z * 1.1); t.lineTo(x + z * 1.2, y - z * .3); t.lineTo(x + z, y + z * .2); t.lineTo(x - z * .6, y + z * .3); t.closePath(); t.fill();
     t.fillStyle = 'rgba(255,255,255,.22)'; t.beginPath(); t.moveTo(x - z * .7, y - z * .9); t.lineTo(x + z * .3, y - z * 1.1); t.lineTo(x - z * .1, y - z * .4); t.closePath(); t.fill();
-  });
-  holes.forEach(h => {
-    t.fillStyle = '#c99d55'; t.beginPath(); t.ellipse(h.x, h.y + 1, 14, 7.5, 0, 0, TAU); t.fill();
-    t.fillStyle = '#4f3718'; t.beginPath(); t.ellipse(h.x, h.y, 10.5, 5.5, 0, 0, TAU); t.fill();
   });
   // starfish
   [[120, 420, .3], [490, 600, 1.2], [210, 690, 2.1], [560, 260, .8]].forEach(([x, y, a]) => {
@@ -251,6 +241,10 @@ function drawBaby(b) {
     ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(ctx, b.x - 11, top - 4, 22, 4, 2); ctx.fill();
     ctx.fillStyle = '#ff5d4a'; rr(ctx, b.x - 10.5, top - 3.5, 21 * fr, 3, 1.5); ctx.fill();
   }
+}
+function drawHole(x, y) {
+  ctx.fillStyle = '#c99d55'; ell(x, y + 1, 14, 7.5); ctx.fill();
+  ctx.fillStyle = '#4f3718'; ell(x, y, 10.5, 5.5); ctx.fill();
 }
 function drawFriend(f, now) {
   const e = 1 - Math.pow(1 - f.pop, 3);
@@ -425,8 +419,26 @@ function updateHud() {
   $('shellNo').textContent = S.shells;
 }
 const FRIEND_LOOK = [['#e0457b', '#7bd389'], ['#2fb86a', '#ff8a3c'], ['#8e5bd9', '#3dc8e8'], ['#ff8a3c', '#e0457b'], ['#3dc8e8', '#ffd23f'], ['#7bd389', '#8e5bd9']];
+// Each friend digs a hole at a random spot: spread over the beach, never next to another friend,
+// clear of the castle and the shore, and close enough to the castle to help.
+const FRIEND_GAP = 150, FRIEND_MAX_R = 300;
+function holeSpot() {
+  let gap = FRIEND_GAP;
+  for (let tries = 0; tries < 600; tries++) {
+    if (tries && tries % 150 === 0) gap *= .85;            // very unlucky draws: relax a little
+    const a = Math.random() * TAU, r = 105 + Math.random() * (FRIEND_MAX_R - 105);
+    const x = CX + Math.cos(a) * r, y = CY + Math.sin(a) * r;
+    if (x < 30 || x > W - 30 || y < SEA_Y + 60 || y > H - 30) continue;
+    if (((x - CX) / 115) ** 2 + ((y - CY) / 55) ** 2 < 1) continue;            // castle and its mound
+    if (S.friends.some(f => Math.hypot(f.x - x, f.y - y) < gap)) continue;
+    if (Math.hypot(S.player.x - x, S.player.y - y) < 30) continue;
+    return { x, y };
+  }
+  return { x: CX + rnd(-200, 200), y: CY + 120 };
+}
 function recruit() {
-  const j = S.friends.length, h = holes[j], c = FRIEND_LOOK[j], dark = j % 2 === 1;
+  const j = S.friends.length, h = holeSpot(), c = FRIEND_LOOK[j], dark = j % 2 === 1;
+  puff(h.x, h.y, 4, 16, '#d6ae66');
   S.friends.push({ x: h.x, y: h.y, cd: rnd(0, .6), aim: -Math.PI / 2, kick: 0, pop: 0,
     trunk: c[0], hat: c[1], skin: dark ? '#d99a6c' : '#ffd0a8', skinD: dark ? '#b97d52' : '#e8b38a' });
 }
@@ -701,6 +713,8 @@ function render(now) {
   ell(p.x, p.y, 10, 3.6); ctx.fill();
   for (const b of ents.babies) { const sc = b.type === 'big' ? 1.45 : 1; ell(b.x, b.y, 8.5 * sc, 3.2 * sc); ctx.fill(); }
   for (const bl of ents.balls) { ell(bl.x, bl.y, 3, 1.3); ctx.fill(); }
+
+  for (const f of S.friends) drawHole(f.x, f.y);
 
   // drops lying on the sand
   for (const s of ents.drops) {
