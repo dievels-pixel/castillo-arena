@@ -8,7 +8,7 @@ Diego es el autor del juego. No es programador: decide el diseño y prueba, Clau
 - Haz cambios pequeños, uno por petición, y deja un commit por cambio con mensaje en español.
 
 ## El juego
-Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en bañador dispara bolas de arena automáticamente a los bebés que vienen a destrozar el castillo. Los bebés se van llorando y sueltan conchas. Las conchas se gastan en el menú del botón Mejoras (el juego espera mientras está abierto): cadencia, daño, alcance, reclutar amigos que disparan desde agujeros (repartidos al azar por la playa, nunca uno junto a otro), entrenarlos y reparar. No hay recuadros en el suelo (se probaron y se quitaron). No hay muralla (se quitó a petición de Diego).
+Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en bañador dispara bolas de arena automáticamente a los bebés que vienen a destrozar el castillo. Los bebés se van llorando y sueltan conchas. Las conchas se gastan en el menú de mejoras, que se abre solo al acabar cada oleada (la siguiente empieza al cerrarlo): cadencia, daño, alcance, reclutar amigos que disparan desde agujeros (repartidos al azar por la playa, nunca uno junto a otro), entrenarlos y reparar. No hay recuadros en el suelo (se probaron y se quitaron). No hay muralla (se quitó a petición de Diego).
 
 ## Estructura
 - `index.html`: página y capas de interfaz (marcador, carteles, fin de partida).

@@ -56,10 +56,6 @@ body{
 .btn:active{transform:translateY(.1em);box-shadow:0 .08em 0 var(--coral-dark)}
 button:focus-visible{outline:.15em solid #fff;outline-offset:.15em}
 
-.shopbtn{position:absolute;right:1em;bottom:1.2em;display:flex;align-items:center;gap:.35em;font:700 1.8em var(--display);color:#fff;background:var(--coral);border:0;border-radius:99em;padding:.5em .9em;box-shadow:0 .18em 0 var(--coral-dark);cursor:pointer}
-.shopbtn .ic{width:1.1em;height:1.1em}
-.shopbtn.ready{animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{50%{transform:scale(1.08)}}
 .card.shop{width:100%;max-width:30em;max-height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:1.3em 1.1em}
 .card.shop h2{margin-bottom:.2em}
 .shop .have{display:flex;align-items:center;justify-content:center;gap:.3em;font-family:var(--display);color:var(--ink)}

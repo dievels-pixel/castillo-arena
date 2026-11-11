@@ -492,14 +492,16 @@ function pause() {
   $('pauseTxt').textContent = 'Oleada ' + S.wave + ' · ' + S.kills + (S.kills === 1 ? ' bebé' : ' bebés') + ' llorando';
   $('paused').hidden = false;
 }
+// The upgrades menu opens by itself after each wave; closing it starts the next one.
 function openShop() {
   if (mode !== 'play' || S.over) return;
   mode = 'shop'; joy.on = false; joy.vx = joy.vy = 0; joyDom(); keys.clear();
+  $('shopTitle').textContent = '¡Oleada ' + S.wave + ' superada!';
+  $('shopClose').textContent = 'Empezar la oleada ' + (S.wave + 1);
   drawShop(); $('shop').hidden = false;
 }
-function closeShop() { if (mode === 'shop') { mode = 'play'; $('shop').hidden = true; } }
-$('shopBtn').addEventListener('click', () => { audioOn(); openShop(); });
-$('shopClose').addEventListener('click', closeShop);
+function closeShop() { if (mode === 'shop') { mode = 'play'; $('shop').hidden = true; startWave(S.wave + 1); } }
+$('shopClose').addEventListener('click', () => { audioOn(); closeShop(); });
 function resume() { audioOn(); if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
 $('play').addEventListener('click', () => { audioOn(); $('start').hidden = true; newGame(); mode = 'play'; });
 $('pauseBtn').addEventListener('click', () => (mode === 'pause' ? resume() : pause()));
@@ -508,9 +510,8 @@ $('quit').addEventListener('click', () => { newGame(); showStart(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (mode === 'shop') { if (k === 'escape' || k === 'm') closeShop(); return; }
-  if (k === 'm') openShop();
-  else if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause());
+  if (mode === 'shop') { if (k === 'enter') closeShop(); return; }
+  if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause());
 });
 
 const bebes = n => n + (n === 1 ? ' bebé' : ' bebés');
@@ -659,12 +660,13 @@ function update(dt) {
   }
   ents.babies = ents.babies.filter(b => !(b.state === 'cry' && (b.cryT > 3.2 || b.x < -30 || b.x > W + 30 || b.y > H + 30 || b.y < 30)));
 
-  // drops (the magnet is built in)
-  const magR = 78;
+  // drops (the magnet is built in; once the wave is beaten every shell flies to the kid)
+  const magR = 78, sweep = S.gap !== null;
   for (let i = ents.drops.length - 1; i >= 0; i--) {
     const s = ents.drops[i]; s.t += dt;
     const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
-    if (s.t > .35 && d < magR && d > .001) { const v = 240 + (magR - d) * 3; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
+    if (sweep && s.t > .35 && d > .001) { const v = 420; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
+    else if (s.t > .35 && d < magR && d > .001) { const v = 240 + (magR - d) * 3; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
     else { s.x += s.vx * dt; s.y += s.vy * dt; const f = Math.pow(.02, dt); s.vx *= f; s.vy *= f; }
     s.x = clamp(s.x, 8, W - 8); s.y = clamp(s.y, 72, H - 8);
     if (d < 14 && s.t > .25) { S.shells += s.v; S.bump = .25; sfx('pick'); ents.drops.splice(i, 1); updateHud(); }
@@ -677,7 +679,11 @@ function update(dt) {
   } else if (S.gap === null) {
     if (!ents.babies.some(b => b.state === 'walk')) { S.gap = 2.2; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; sfx('clear'); }
   } else {
-    S.gap -= dt; if (S.gap <= 0) startWave(S.wave + 1);
+    S.gap -= dt;
+    if (S.gap <= 0) {
+      for (const s of ents.drops) S.shells += s.v;             // any shell still on its way counts
+      ents.drops.length = 0; updateHud(); openShop();
+    }
   }
   updateParticles(dt);
   for (const f of floats) if (f.life > 0) { f.life -= dt; f.h += 24 * dt; }
@@ -755,8 +761,6 @@ function render(now) {
   drawOffscreen();
 
   // DOM overlays
-  const ready = mode === 'play' && !S.over && SHOP.some(affordable), sb = $('shopBtn');
-  if (sb.classList.contains('ready') !== ready) sb.classList.toggle('ready', ready);
   $('shellChip').style.transform = S.bump > 0 ? 'scale(' + (1 + S.bump * .6) + ')' : '';
   const bn = $('banner');
   if (S.banner > 0 && !S.over && mode === 'play') { const a = Math.min(1, S.banner / .5); bn.textContent = S.bannerTxt; bn.style.opacity = a; bn.style.transform = 'scale(' + (1 + (1 - a) * .15) + ')'; } else bn.style.opacity = 0;
