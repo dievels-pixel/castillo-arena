@@ -13,7 +13,8 @@ const TAU = Math.PI * 2;
    View: fixed top-down tilted camera; a thing's height above the sand is drawn upwards (y - h). ---------- */
 const VW = 360, VH = 640;                 // what the screen shows
 const W = 600, H = 760;                   // the whole beach; the camera follows the kid
-const CX = 300, CY = 440, CR = 62;        // castle centre and its attack radius
+const CS = .75;                           // castle scale (1 = original size)
+const CX = 300, CY = 440, CR = Math.round(62 * CS);   // castle centre and its attack radius
 const SEA_Y = 56;                         // shoreline
 
 /* ---------- canvas sizing ---------- */
@@ -87,7 +88,7 @@ function buildBg() {
     t.closePath(); t.fill(); t.restore();
   });
   // bucket and spade left by the castle
-  t.save(); t.translate(CX + 108, CY + 40);
+  t.save(); t.translate(CX + 108 * CS, CY + 40 * CS);
   t.fillStyle = 'rgba(90,60,20,.2)'; t.beginPath(); t.ellipse(2, 1, 11, 4, 0, 0, TAU); t.fill();
   t.fillStyle = '#ff5d4a'; t.beginPath(); t.moveTo(-8, -16); t.lineTo(8, -16); t.lineTo(6, 0); t.lineTo(-6, 0); t.closePath(); t.fill();
   t.fillStyle = '#d94436'; t.beginPath(); t.ellipse(0, -16, 8, 2.6, 0, 0, TAU); t.fill();
@@ -96,7 +97,7 @@ function buildBg() {
   t.fillStyle = '#2c6fe0'; t.beginPath(); t.ellipse(12.5, 1, 3.5, 5, .45, 0, TAU); t.fill();
   t.restore();
   // castle mound
-  t.fillStyle = '#d6ae66'; t.beginPath(); t.ellipse(CX, CY + 4, 92, 30, 0, 0, TAU); t.fill();
+  t.fillStyle = '#d6ae66'; t.beginPath(); t.ellipse(CX, CY + 4 * CS, 92 * CS, 30 * CS, 0, 0, TAU); t.fill();
 }
 // The shoreline undulates along the beach and moves with time (two waves of different length).
 const shoreY = (x, t) => SEA_Y + Math.sin(x * .012 + t * .8) * 7 + Math.sin(x * .031 - t * 1.3) * 3.5;
@@ -133,7 +134,7 @@ function tower(x, base, h, r) {
 }
 function drawCastle(now) {
   const hf = clamp(S.hp / 100, 0, 1), k = .72 + .28 * hf, sx = S.shake > 0 ? Math.sin(now * 90) * S.shake * 10 : 0;
-  ctx.save(); ctx.translate(CX + sx, CY); ctx.scale(1, k);
+  ctx.save(); ctx.translate(CX + sx, CY); ctx.scale(CS, CS * k);
   // keep (back)
   ctx.fillStyle = SAND_D; ctx.fillRect(-20, -66, 40, 54);
   ctx.fillStyle = SAND; ctx.fillRect(-20, -66, 37, 54);
@@ -425,21 +426,23 @@ function updateHud() {
 }
 const FRIEND_LOOK = [['#e0457b', '#7bd389'], ['#2fb86a', '#ff8a3c'], ['#8e5bd9', '#3dc8e8'], ['#ff8a3c', '#e0457b'], ['#3dc8e8', '#ffd23f'], ['#7bd389', '#8e5bd9']];
 // Each friend digs a hole at a random spot: spread over the beach, never next to another friend,
-// clear of the castle and the shore, and close enough to the castle to help.
+// clear of the castle and the shore, and always in the zone north of the castle (where the babies
+// arrive from), because friends behind it or beside it never reach anyone.
 const FRIEND_GAP = 150, FRIEND_MAX_R = 300;
 function holeSpot() {
   let gap = FRIEND_GAP;
   for (let tries = 0; tries < 600; tries++) {
     if (tries && tries % 150 === 0) gap *= .85;            // very unlucky draws: relax a little
-    const a = Math.random() * TAU, r = 105 + Math.random() * (FRIEND_MAX_R - 105);
+    const a = -Math.PI * (.08 + Math.random() * .84), r = 105 * CS + Math.random() * (FRIEND_MAX_R - 105 * CS);
     const x = CX + Math.cos(a) * r, y = CY + Math.sin(a) * r;
     if (x < 30 || x > W - 30 || y < SEA_Y + 60 || y > H - 30) continue;
-    if (((x - CX) / 115) ** 2 + ((y - CY) / 55) ** 2 < 1) continue;            // castle and its mound
+    if (y > CY - 50) continue;                                                  // north of the castle only
+    if (((x - CX) / (115 * CS)) ** 2 + ((y - CY) / (55 * CS)) ** 2 < 1) continue;  // castle and its mound
     if (S.friends.some(f => Math.hypot(f.x - x, f.y - y) < gap)) continue;
     if (Math.hypot(S.player.x - x, S.player.y - y) < 30) continue;
     return { x, y };
   }
-  return { x: CX + rnd(-200, 200), y: CY + 120 };
+  return { x: CX + rnd(-200, 200), y: CY - 120 };
 }
 function recruit() {
   const j = S.friends.length, h = holeSpot(), c = FRIEND_LOOK[j], dark = j % 2 === 1;
@@ -559,7 +562,7 @@ function die(b) {
 }
 function hitCastle(d) {
   S.hp = Math.max(0, S.hp - d); S.shake = .25; sfx('castle');
-  puff(CX + rnd(-40, 40), CY + 8, 30, 3, '#d9b873'); updateHud();
+  puff(CX + rnd(-40, 40) * CS, CY + 8 * CS, 30, 3, '#d9b873'); updateHud();
   if (S.hp <= 0) gameOver();
 }
 function nearest(x, y, range) {
@@ -595,7 +598,8 @@ function update(dt) {
   if (p.moving) p.walk += dt * mag;
   p.x = clamp(p.x, 14, W - 14); p.y = clamp(p.y, 76, H - 16);
   const pdx = p.x - CX, pdy = p.y - CY, pd = Math.hypot(pdx, pdy);
-  if (pd < 66 && pd > .01) { p.x = CX + pdx / pd * 66; p.y = CY + pdy / pd * 66; }
+  const pr = 66 * CS;
+  if (pd < pr && pd > .01) { p.x = CX + pdx / pd * pr; p.y = CY + pdy / pd * pr; }
   followCam(dt);
 
   // kid auto fire
