@@ -6,6 +6,7 @@ Diego es el autor del juego. No es programador: decide el diseño y prueba, Clau
 - Explica los cambios en términos de juego ("ahora los bebés grandes van más lentos"), no de código, salvo que pregunte.
 - Si una petición es ambigua o tiene un coste oculto (rendimiento en móvil, romper otra mecánica), dilo antes de hacerla.
 - Haz cambios pequeños, uno por petición, y deja un commit por cambio con mensaje en español.
+- Sube cada commit directamente a `main`, sin ramas ni pull requests: Diego prefiere no tener que aprobar nada. Si hay que deshacer algo, se hace con un commit de reversión.
 
 ## El juego
 Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en bañador dispara bolas de arena automáticamente a los bebés que vienen a destrozar el castillo. Los bebés se van llorando y sueltan conchas. Las conchas se gastan en el menú de mejoras, que se abre solo al acabar cada oleada (la siguiente empieza al cerrarlo): cadencia, daño, alcance, reclutar amigos que disparan desde agujeros (repartidos al azar por la playa, nunca uno junto a otro), entrenarlos y reparar. No hay recuadros en el suelo (se probaron y se quitaron). No hay muralla (se quitó a petición de Diego).
