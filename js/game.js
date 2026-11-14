@@ -428,6 +428,7 @@ const FRIEND_LOOK = [['#e0457b', '#7bd389'], ['#2fb86a', '#ff8a3c'], ['#8e5bd9',
 // Each friend digs a hole at a random spot: spread over the beach, never next to another friend,
 // clear of the castle and the shore, and always in the zone north of the castle (where the babies
 // arrive from), because friends behind it or beside it never reach anyone.
+const COLLECT_TIME = 6;                   // seconds to pick up shells after the last baby of a wave
 const FRIEND_GAP = 150, FRIEND_MAX_R = 300;
 function holeSpot() {
   let gap = FRIEND_GAP;
@@ -664,13 +665,12 @@ function update(dt) {
   }
   ents.babies = ents.babies.filter(b => !(b.state === 'cry' && (b.cryT > 3.2 || b.x < -30 || b.x > W + 30 || b.y > H + 30 || b.y < 30)));
 
-  // drops (the magnet is built in; once the wave is beaten every shell flies to the kid)
-  const magR = 78, sweep = S.gap !== null;
+  // drops (the magnet is built in; shells must be picked up during the game)
+  const magR = 78;
   for (let i = ents.drops.length - 1; i >= 0; i--) {
     const s = ents.drops[i]; s.t += dt;
     const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
-    if (sweep && s.t > .35 && d > .001) { const v = 420; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
-    else if (s.t > .35 && d < magR && d > .001) { const v = 240 + (magR - d) * 3; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
+    if (s.t > .35 && d < magR && d > .001) { const v = 240 + (magR - d) * 3; s.x += dx / d * v * dt; s.y += dy / d * v * dt; }
     else { s.x += s.vx * dt; s.y += s.vy * dt; const f = Math.pow(.02, dt); s.vx *= f; s.vy *= f; }
     s.x = clamp(s.x, 8, W - 8); s.y = clamp(s.y, 72, H - 8);
     if (d < 14 && s.t > .25) { S.shells += s.v; S.bump = .25; sfx('pick'); ents.drops.splice(i, 1); updateHud(); }
@@ -681,12 +681,15 @@ function update(dt) {
     S.spawnT -= dt;
     if (S.spawnT <= 0) { spawnBaby(); S.spawnLeft--; S.spawnT = Math.max(.45, 1.5 - .07 * S.wave) * (.7 + Math.random() * .6); }
   } else if (S.gap === null) {
-    if (!ents.babies.some(b => b.state === 'walk')) { S.gap = 2.2; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; sfx('clear'); }
+    if (!ents.babies.some(b => b.state === 'walk')) { S.gap = COLLECT_TIME; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; sfx('clear'); }
   } else {
+    // a few seconds to pick up the shells left on the sand; whatever is left is lost
     S.gap -= dt;
-    if (S.gap <= 0) {
-      for (const s of ents.drops) S.shells += s.v;             // any shell still on its way counts
-      ents.drops.length = 0; updateHud(); openShop();
+    const shown = COLLECT_TIME - S.gap;
+    if (shown > 1.5 && ents.drops.length) { S.banner = .6; S.bannerTxt = '¡Recoge las conchas! ' + Math.ceil(S.gap); }
+    if (S.gap <= 0 || (shown > 1.5 && !ents.drops.length)) {
+      for (const s of ents.drops) puff(s.x, s.y, 4, 5, '#f7a8ba');
+      ents.drops.length = 0; openShop();
     }
   }
   updateParticles(dt);
@@ -732,7 +735,9 @@ function render(now) {
   for (const f of S.friends) drawHole(f.x, f.y);
 
   // drops lying on the sand
+  const blink = S.gap !== null && S.gap < 2 && Math.sin(now * 20) < 0;   // shells about to be lost
   for (const s of ents.drops) {
+    if (blink) continue;
     const yy = s.y - 4 - Math.sin(now * 4 + s.ph) * 1.2, spin = now * 2 + s.ph;
     if (s.kind === 'conch') conchIcon(s.x, yy, 6.5, spin); else shellIcon(s.x, yy, 5, spin);
   }
