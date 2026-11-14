@@ -370,11 +370,11 @@ function itemState(id) {
     return { name: u.name, now: u.fmt(u.val(l)), next: maxed ? '' : u.fmt(u.val(l + 1)), note: 'Nivel ' + l + ' de ' + u.max, cost: maxed ? 0 : upCost(u, l), maxed, enabled: true };
   }
   if (id === 'friend') {
-    const n = S.friends.length, maxed = n >= 6;
-    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Disparan solos desde un agujero', cost: maxed ? 0 : FRIEND_COST[n], maxed, enabled: true };
+    const n = S.friends.length + S.pending, maxed = n >= 6;
+    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Tú eliges dónde cava su agujero', cost: maxed ? 0 : FRIEND_COST[n], maxed, enabled: true };
   }
   if (id === 'train') {
-    const l = S.friendLvl, maxed = l >= 6, has = S.friends.length > 0, fmt = k => f1(.7 + .12 * k) + ' b/s · daño ' + f1(1.5 + .5 * k);
+    const l = S.friendLvl, maxed = l >= 6, has = S.friends.length + S.pending > 0, fmt = k => f1(.7 + .12 * k) + ' b/s · daño ' + f1(1.5 + .5 * k);
     return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de 6, para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: has };
   }
   const hurt = S.hp < 100;
@@ -385,7 +385,7 @@ function buy(id) {
   if (!affordable(id)) return;
   S.shells -= itemState(id).cost;
   if (UPG[id]) S.up[id]++;
-  else if (id === 'friend') recruit();
+  else if (id === 'friend') S.pending++;
   else if (id === 'train') S.friendLvl++;
   else S.hp = Math.min(100, S.hp + 35);
   updateHud(); sfx('buy'); puff(S.player.x, S.player.y, 30, 14, '#fff3b0'); drawShop();
@@ -407,11 +407,11 @@ const ents = { babies: [], balls: [], drops: [] };
 const KID_LOOK = { skin: '#f0b48a', skinD: '#d9976a', trunk: '#2c6fe0', hat: 'straw', s: 1.1 };
 
 function newGame() {
-  ents.babies = []; ents.balls = []; ents.drops = [];
+  ents.babies = []; ents.balls = []; ents.drops = []; $('place').hidden = true;
   S = {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
     over: false, shake: 0, bump: 0, hint: 9,
-    up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0,
+    up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0, pending: 0,
     player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
   startWave(1); updateHud(); followCam();
@@ -426,28 +426,20 @@ function updateHud() {
   $('shellNo').textContent = S.shells;
 }
 const FRIEND_LOOK = [['#e0457b', '#7bd389'], ['#2fb86a', '#ff8a3c'], ['#8e5bd9', '#3dc8e8'], ['#ff8a3c', '#e0457b'], ['#3dc8e8', '#ffd23f'], ['#7bd389', '#8e5bd9']];
-// Each friend digs a hole at a random spot: spread over the beach, never next to another friend,
-// clear of the castle and the shore, and always in the zone north of the castle (where the babies
-// arrive from), because friends behind it or beside it never reach anyone.
 const COLLECT_TIME = 6;                   // seconds to pick up shells after the last baby of a wave
-const FRIEND_GAP = 150, FRIEND_MAX_R = 300;
-function holeSpot() {
-  let gap = FRIEND_GAP;
-  for (let tries = 0; tries < 600; tries++) {
-    if (tries && tries % 150 === 0) gap *= .85;            // very unlucky draws: relax a little
-    const a = -Math.PI * (.08 + Math.random() * .84), r = 105 * CS + Math.random() * (FRIEND_MAX_R - 105 * CS);
-    const x = CX + Math.cos(a) * r, y = CY + Math.sin(a) * r;
-    if (x < 30 || x > W - 30 || y < SEA_Y + 60 || y > H - 30) continue;
-    if (y > CY - 50) continue;                                                  // north of the castle only
-    if (((x - CX) / (115 * CS)) ** 2 + ((y - CY) / (55 * CS)) ** 2 < 1) continue;  // castle and its mound
-    if (S.friends.some(f => Math.hypot(f.x - x, f.y - y) < gap)) continue;
-    if (Math.hypot(S.player.x - x, S.player.y - y) < 30) continue;
-    return { x, y };
-  }
-  return { x: CX + rnd(-200, 200), y: CY - 120 };
+// Friends are placed by the player before the next wave: the kid walks to the spot and digs.
+// Allowed: between the castle and the sea (where the babies come from), off the shore, not on the
+// castle and never next to another friend.
+const FRIEND_GAP = 150;
+function spotProblem(x, y) {
+  if (y < SEA_Y + 60) return 'Demasiado cerca del mar';
+  if (((x - CX) / (115 * CS)) ** 2 + ((y - CY) / (55 * CS)) ** 2 < 1) return 'Encima del castillo no';
+  if (y > CY - 50) return 'Tiene que estar delante del castillo, hacia el mar';
+  if (S.friends.some(f => Math.hypot(f.x - x, f.y - y) < FRIEND_GAP)) return 'Muy cerca de otro amigo';
+  return '';
 }
-function recruit() {
-  const j = S.friends.length, h = holeSpot(), c = FRIEND_LOOK[j], dark = j % 2 === 1;
+function recruit(x, y) {
+  const j = S.friends.length, h = { x, y }, c = FRIEND_LOOK[j], dark = j % 2 === 1;
   puff(h.x, h.y, 4, 16, '#d6ae66');
   S.friends.push({ x: h.x, y: h.y, cd: rnd(0, .6), aim: -Math.PI / 2, kick: 0, pop: 0,
     trunk: c[0], hat: c[1], skin: dark ? '#d99a6c' : '#ffd0a8', skinD: dark ? '#b97d52' : '#e8b38a' });
@@ -464,7 +456,7 @@ function joyDom() {
 }
 stage.addEventListener('pointerdown', e => {
   audioOn();
-  if (mode !== 'play' || S.over || e.target.closest('button')) return;
+  if ((mode !== 'play' && mode !== 'place') || S.over || e.target.closest('button')) return;
   const p = toLog(e); joy.on = true; joy.id = e.pointerId; joy.ox = p.x; joy.oy = p.y; joy.vx = joy.vy = 0; joyDom();
   try { stage.setPointerCapture(e.pointerId); } catch (err) {}
 });
@@ -505,7 +497,28 @@ function openShop() {
   $('shopClose').textContent = 'Empezar la oleada ' + (S.wave + 1);
   drawShop(); $('shop').hidden = false;
 }
-function closeShop() { if (mode === 'shop') { mode = 'play'; $('shop').hidden = true; startWave(S.wave + 1); } }
+function closeShop() {
+  if (mode !== 'shop') return;
+  $('shop').hidden = true;
+  if (S.pending > 0) { mode = 'place'; placeKey = ''; $('place').hidden = false; }
+  else { mode = 'play'; startWave(S.wave + 1); }
+}
+let placeKey = '';
+function updatePlaceBar() {
+  const p = S.player, why = spotProblem(p.x, p.y), key = why + S.pending;
+  if (key === placeKey) return; placeKey = key;
+  $('placeTxt').textContent = (S.pending > 1 ? 'Quedan ' + S.pending + ' amigos por colocar. ' : '') + (why || '¡Buen sitio!');
+  $('placeTxt').classList.toggle('bad', !!why);
+  $('dig').disabled = !!why;
+}
+function dig() {
+  if (mode !== 'place') return;
+  const p = S.player; if (spotProblem(p.x, p.y)) return;
+  recruit(p.x, p.y); S.pending--; sfx('buy');
+  if (S.pending > 0) { placeKey = ''; return; }
+  mode = 'play'; $('place').hidden = true; startWave(S.wave + 1);
+}
+$('dig').addEventListener('click', () => { audioOn(); dig(); });
 $('shopClose').addEventListener('click', () => { audioOn(); closeShop(); });
 function resume() { audioOn(); if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
 $('play').addEventListener('click', () => { audioOn(); $('start').hidden = true; newGame(); mode = 'play'; });
@@ -516,6 +529,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (mode === 'shop') { if (k === 'enter') closeShop(); return; }
+  if (mode === 'place') { if (k === 'enter' || k === ' ') dig(); return; }
   if (k === 'escape' || k === 'p') (mode === 'pause' ? resume() : pause());
 });
 
@@ -581,7 +595,7 @@ function shoot(x, y, a, dmg, max) {
 }
 
 function update(dt) {
-  if (mode !== 'play' || S.over) return;
+  if ((mode !== 'play' && mode !== 'place') || S.over) return;
   S.t += dt;
   const p = S.player;
   S.shake = Math.max(0, S.shake - dt); S.bump = Math.max(0, S.bump - dt);
@@ -677,8 +691,9 @@ function update(dt) {
     if (d < 14 && s.t > .25) { S.shells += s.v; S.bump = .25; sfx('pick'); ents.drops.splice(i, 1); updateHud(); }
   }
 
-  // waves
-  if (S.spawnLeft > 0) {
+  // waves (on hold while friends are being placed)
+  if (mode === 'place') updatePlaceBar();
+  else if (S.spawnLeft > 0) {
     S.spawnT -= dt;
     if (S.spawnT <= 0) { spawnBaby(); S.spawnLeft--; S.spawnT = Math.max(.45, 1.5 - .07 * S.wave) * (.7 + Math.random() * .6); }
   } else if (S.gap === null) {
@@ -734,6 +749,16 @@ function render(now) {
   for (const bl of ents.balls) { ell(bl.x, bl.y, 3, 1.3); ctx.fill(); }
 
   for (const f of S.friends) drawHole(f.x, f.y);
+
+  if (mode === 'place') {     // where the new friend would dig, and what it would reach
+    const bad = !!spotProblem(p.x, p.y);
+    ctx.setLineDash([5, 5]); ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255,93,74,.35)';
+    for (const f of S.friends) { ctx.beginPath(); ctx.arc(f.x, f.y, FRIEND_GAP, 0, TAU); ctx.stroke(); }
+    ctx.strokeStyle = bad ? 'rgba(255,93,74,.8)' : 'rgba(47,184,106,.9)';
+    ctx.beginPath(); ctx.arc(p.x, p.y, F_RANGE, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = bad ? 'rgba(255,93,74,.55)' : 'rgba(47,184,106,.6)'; ell(p.x, p.y + 1, 14, 7.5); ctx.fill();
+  }
 
   // drops lying on the sand
   const blink = S.gap !== null && S.gap < 2 && Math.sin(now * 20) < 0;   // shells about to be lost
