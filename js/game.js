@@ -8,6 +8,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
+// Version shown on the start and pause screens. Bump the number and date with every change.
+const VERSION = 'Versión 25 · 14 nov 2026';
+document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
    View: fixed top-down tilted camera; a thing's height above the sand is drawn upwards (y - h). ---------- */

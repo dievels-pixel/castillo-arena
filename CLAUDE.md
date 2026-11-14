@@ -6,6 +6,7 @@ Diego es el autor del juego. No es programador: decide el diseño y prueba, Clau
 - Explica los cambios en términos de juego ("ahora los bebés grandes van más lentos"), no de código, salvo que pregunte.
 - Si una petición es ambigua o tiene un coste oculto (rendimiento en móvil, romper otra mecánica), dilo antes de hacerla.
 - Haz cambios pequeños, uno por petición, y deja un commit por cambio con mensaje en español.
+- En cada commit sube el número y la fecha de `VERSION` (al principio de `js/game.js`): se ve en la portada y en la pausa, y así Diego sabe si tiene abierta la última.
 - Sube cada commit directamente a `main`, sin ramas ni pull requests: Diego prefiere no tener que aprobar nada. Si hay que deshacer algo, se hace con un commit de reversión.
 
 ## El juego
