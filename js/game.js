@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 28 · 14 nov 2026';
+const VERSION = 'Versión 29 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -225,7 +225,10 @@ function drawBaby(b) {
   ctx.fillStyle = hc; ctx.strokeStyle = hc;
   if (b.hair === 0) { ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, cy - 8.5); ctx.quadraticCurveTo(-1, cy - 14, 3, cy - 13.5); ctx.quadraticCurveTo(5, cy - 11, 2.2, cy - 10.6); ctx.stroke(); }
   else if (b.hair === 1) { for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(k * 3 - 2, cy - 8.2); ctx.lineTo(k * 3.6, cy - 13 + Math.abs(k)); ctx.lineTo(k * 3 + 2, cy - 8.2); ctx.closePath(); ctx.fill(); } }
-  else if (b.hair === 2) { ell(-9.5, cy - 5, 2.8, 2.8); ctx.fill(); ell(9.5, cy - 5, 2.8, 2.8); ctx.fill(); ctx.fillStyle = tint('#ff7aa2', f); ell(-7.8, cy - 6.5, 1.6, 1.1); ctx.fill(); ell(7.8, cy - 6.5, 1.6, 1.1); ctx.fill(); }
+  else if (b.hair === 2) {      // hair on top with a centre parting, and two pigtails with bows
+    ctx.beginPath(); ctx.ellipse(0, cy, 10.2, 9.2, 0, Math.PI, TAU); ctx.quadraticCurveTo(6, cy - 5.5, 0, cy - 6.5); ctx.quadraticCurveTo(-6, cy - 5.5, -10.2, cy); ctx.fill();
+    ctx.strokeStyle = tint(b.skin, f); ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(0, cy - 9); ctx.lineTo(0, cy - 6.6); ctx.stroke();
+    ell(-9.5, cy - 5, 2.8, 2.8); ctx.fill(); ell(9.5, cy - 5, 2.8, 2.8); ctx.fill(); ctx.fillStyle = tint('#ff7aa2', f); ell(-7.8, cy - 6.5, 1.6, 1.1); ctx.fill(); ell(7.8, cy - 6.5, 1.6, 1.1); ctx.fill(); }
   else { ctx.beginPath(); ctx.ellipse(0, cy, 10, 9, 0, Math.PI, TAU); for (let x = 10; x >= -10; x -= 4) ctx.lineTo(x, cy - 4 + ((x / 4) % 2 ? 1.5 : 0)); ctx.closePath(); ctx.fill(); }
   // face: eyes wide apart, mouth between them
   if (cry) {
