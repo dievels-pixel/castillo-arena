@@ -56,11 +56,13 @@ body{
 .btn:active{transform:translateY(.1em);box-shadow:0 .08em 0 var(--coral-dark)}
 button:focus-visible{outline:.15em solid #fff;outline-offset:.15em}
 
-.card.shop{width:100%;max-width:30em;max-height:100%;box-sizing:border-box;display:flex;flex-direction:column;padding:1.3em 1.1em}
+#shop{display:flex;align-items:center;justify-content:center;padding:1em}
+.card.shop{width:100%;max-width:30em;max-height:100%;min-height:0;box-sizing:border-box;display:flex;flex-direction:column;padding:1.1em 1em}
+.card.shop .btn{flex:none}
 .card.shop h2{margin-bottom:.2em}
 .shop .have{display:flex;align-items:center;justify-content:center;gap:.3em;font-family:var(--display);color:var(--ink)}
-#shopList{overflow:auto;margin:0 0 1em;display:flex;flex-direction:column;gap:.6em}
-.item{display:flex;align-items:center;gap:.8em;background:#f6e6bd;border-radius:1em;padding:.7em .9em;text-align:left}
+#shopList{flex:1 1 auto;min-height:0;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 0 .9em;display:flex;flex-direction:column;gap:.5em}
+.item{flex:none;display:flex;align-items:center;gap:.8em;background:#f6e6bd;border-radius:1em;padding:.55em .9em;text-align:left}
 .item .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15em}
 .item b{font:700 1.6em/1.1 var(--display);color:var(--ink)}
 .item span{font-size:1.3em;font-weight:800;color:#6b4e2a}
