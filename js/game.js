@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 29 · 14 nov 2026';
+const VERSION = 'Versión 30 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -477,7 +477,7 @@ const FRIEND_LOOK = [
   { trunk: '#ffd23f', hat: { type: 'band', c: '#8e5bd9', c2: '#e0457b', hair: '#c8642b' }, skin: 0 }
 ];
 const FRIEND_SKIN = [['#ffd0a8', '#e8b38a'], ['#f0b48a', '#d9976a'], ['#d99a6c', '#b97d52'], ['#a86b45', '#8a5634']];
-const COLLECT_TIME = 6;                   // seconds to pick up shells after the last baby of a wave
+const COLLECT_TIME = 3;                   // seconds to pick up shells after the last baby of a wave
 // Friends are placed by the player before the next wave: the kid walks to the spot and digs.
 // Allowed: between the castle and the sea (where the babies come from), off the shore, not on the
 // castle and never next to another friend.
@@ -753,7 +753,7 @@ function update(dt) {
     // a few seconds to pick up the shells left on the sand; whatever is left is lost
     S.gap -= dt;
     const shown = COLLECT_TIME - S.gap;
-    if (shown > 1.5 && ents.drops.length) { S.banner = .6; S.bannerTxt = '¡Recoge las conchas! ' + Math.ceil(S.gap); }
+    if (shown > .8 && ents.drops.length) { S.banner = .6; S.bannerTxt = '¡Recoge las conchas! ' + Math.ceil(S.gap); }
     if (S.gap <= 0 || (shown > 1.5 && !ents.drops.length)) {
       for (const s of ents.drops) puff(s.x, s.y, 4, 5, '#f7a8ba');
       ents.drops.length = 0; openShop();
@@ -812,7 +812,7 @@ function render(now) {
   }
 
   // drops lying on the sand
-  const blink = S.gap !== null && S.gap < 2 && Math.sin(now * 20) < 0;   // shells about to be lost
+  const blink = S.gap !== null && S.gap < 1.2 && Math.sin(now * 20) < 0;   // shells about to be lost
   for (const s of ents.drops) {
     if (blink) continue;
     const yy = s.y - 4 - Math.sin(now * 4 + s.ph) * 1.2, spin = now * 2 + s.ph;
