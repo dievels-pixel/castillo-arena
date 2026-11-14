@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 33 · 14 nov 2026';
+const VERSION = 'Versión 34 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -467,7 +467,7 @@ function newGame() {
   ents.babies = []; ents.balls = []; ents.drops = []; $('place').hidden = true;
   S = {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
-    over: false, shake: 0, bump: 0, hint: 9, hit: false, repaired: false, bossAt: -1,
+    over: false, shake: 0, bump: 0, hint: 9, level: currentLevel, hit: false, repaired: false, bossAt: -1,
     up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0, pending: 0,
     player: { x: CX, y: 540, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
@@ -548,9 +548,98 @@ addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
 $('again').addEventListener('click', () => { audioOn(); $('over').hidden = true; newGame(); mode = 'play'; });
 function showStart() {
-  mode = 'start'; $('paused').hidden = true; $('over').hidden = true; $('start').hidden = false;
-  const r = $('startRec'); r.hidden = !best; r.textContent = 'Tu récord: oleada ' + best + ' · ' + bebes(bestKills);
+  mode = 'start'; $('paused').hidden = true; $('over').hidden = true; $('won').hidden = true; $('start').hidden = false;
+  drawMap();
 }
+
+/* ---------- start screen: the road of castles, one per level ---------- */
+const LEVELS = 5, LEVELS_READY = 1;   // levels shown on the map / levels that already have content
+const MAP_NODES = [[105, 418, 30], [250, 336, 33], [112, 250, 36], [252, 160, 40], [150, 70, 44]];  // x, y, radius in a 360x480 map
+let currentLevel = 1, msgT = 0;
+const unlocked = n => n === 1 || (progress[n - 1] || 0) > 0;
+// Castle drawn as SVG, bigger and grander with each level. Base centred at (0,0), units roughly in pixels.
+function castleSvg(level) {
+  const L = '#f3dba5', M = '#e8c680', D = '#cfa45c', roof = '#e0573f', wood = '#6f4b20';
+  const specs = [
+    { wall: [32, 10], towers: [[-14, 8, 18, 0], [14, 8, 18, 0]], keep: null },
+    { wall: [36, 12], towers: [[-17, 9, 22, 0], [17, 9, 22, 0]], keep: [14, 28, 0] },
+    { wall: [40, 12], towers: [[-19, 9, 24, 1], [19, 9, 24, 1]], keep: [14, 32, 1] },
+    { wall: [46, 14], towers: [[-22, 10, 28, 1], [22, 10, 28, 1], [-10, 9, 36, 1], [10, 9, 36, 1]], keep: null },
+    { wall: [52, 14], towers: [[-25, 10, 30, 1], [25, 10, 30, 1], [-13, 10, 40, 1], [13, 10, 40, 1]], keep: [14, 52, 1] }
+  ][level - 1];
+  let g = '';
+  const tower = (x, w, h, spire) => {
+    let t = '<rect x="' + (x - w / 2) + '" y="' + (-h) + '" width="' + w + '" height="' + h + '" fill="' + M + '"/>' +
+            '<rect x="' + (x + w / 2 - 2.5) + '" y="' + (-h) + '" width="2.5" height="' + h + '" fill="' + D + '"/>' +
+            '<rect x="' + (x - 1.2) + '" y="' + (-h * .62) + '" width="2.4" height="4.5" rx="1.2" fill="' + wood + '"/>';
+    if (spire) {
+      t += '<path d="M' + (x - w / 2 - 1.5) + ' ' + (-h) + 'L' + x + ' ' + (-h - w * 1.3) + 'L' + (x + w / 2 + 1.5) + ' ' + (-h) + 'Z" fill="' + roof + '"/>' +
+           '<path d="M' + x + ' ' + (-h - w * 1.3) + 'v-7" stroke="' + wood + '" stroke-width="1"/><path d="M' + x + ' ' + (-h - w * 1.3 - 7) + 'l6 2 -6 2z" fill="#ffd23f"/>';
+    } else {
+      for (let k = 0; k < 3; k++) t += '<rect x="' + (x - w / 2 + k * (w / 2 - 1)) + '" y="' + (-h - 3) + '" width="' + (w / 3) + '" height="3" fill="' + M + '"/>';
+    }
+    return t;
+  };
+  const sp = specs;
+  // back towers first (taller inner ones), then keep, then outer ones, then wall
+  const inner = sp.towers.filter(t => Math.abs(t[0]) < 15), outer = sp.towers.filter(t => Math.abs(t[0]) >= 15);
+  if (sp.keep) g += tower(0, sp.keep[0], sp.keep[1], sp.keep[2]);
+  inner.forEach(t => { g += tower(t[0], t[1], t[2], t[3]); });
+  outer.forEach(t => { g += tower(t[0], t[1], t[2], t[3]); });
+  const [ww, wh] = sp.wall;
+  g += '<rect x="' + (-ww / 2) + '" y="' + (-wh) + '" width="' + ww + '" height="' + wh + '" fill="' + M + '"/>' +
+       '<rect x="' + (-ww / 2) + '" y="' + (-wh) + '" width="' + ww + '" height="2.5" fill="' + L + '"/>';
+  for (let x = -ww / 2; x < ww / 2 - 2; x += 6) g += '<rect x="' + x + '" y="' + (-wh - 3) + '" width="3.5" height="3" fill="' + M + '"/>';
+  g += '<path d="M-4 0v-' + (wh * .55) + 'a4 4 0 0 1 8 0V0z" fill="' + wood + '"/>';
+  return g;
+}
+const starPath = (cx, cy, r) => { let d = ''; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr2 = k % 2 ? r * .45 : r; d += (k ? 'L' : 'M') + (cx + Math.cos(a) * rr2).toFixed(1) + ' ' + (cy + Math.sin(a) * rr2).toFixed(1); } return d + 'Z'; };
+function drawMap() {
+  let next = 1; while (next < LEVELS && (progress[next] || 0) > 0) next++;
+  let svg = '<svg viewBox="0 0 360 480" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+  // sandy road joining the castles
+  let d = 'M' + MAP_NODES[0][0] + ' ' + MAP_NODES[0][1];
+  for (let i = 1; i < LEVELS; i++) {
+    const [x, y] = MAP_NODES[i], [px, py] = MAP_NODES[i - 1];
+    d += 'C' + px + ' ' + (py - 45) + ' ' + x + ' ' + (y + 45) + ' ' + x + ' ' + y;
+  }
+  svg += '<path d="' + d + '" fill="none" stroke="#d2ad66" stroke-width="13" stroke-linecap="round"/>' +
+         '<path d="' + d + '" fill="none" stroke="#f5e4b5" stroke-width="4" stroke-dasharray="2 10" stroke-linecap="round"/>';
+  for (let i = 0; i < LEVELS; i++) {
+    const n = i + 1, [x, y, r] = MAP_NODES[i], stars = progress[n] || 0, open = unlocked(n), isNext = n === next && open;
+    const cls = 'lvl' + (open ? '' : ' locked') + (isNext ? ' next' : '');
+    svg += '<g class="' + cls + '" data-lvl="' + n + '">';
+    svg += '<circle cx="' + x + '" cy="' + (y + 4) + '" r="' + r + '" fill="rgba(90,60,20,.18)"/>';
+    svg += '<circle class="ring" cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + (open ? '#fbecc4' : '#e3d6b6') + '" stroke="' + (isNext ? '#ff5d4a' : '#c99d55') + '" stroke-width="3.5"/>';
+    svg += '<g transform="translate(' + x + ' ' + (y + r * .55) + ') scale(' + (r / 30).toFixed(2) + ')"' + (open ? '' : ' opacity=".35"') + '>' + castleSvg(n) + '</g>';
+    if (!open) svg += '<g transform="translate(' + x + ' ' + (y + 2) + ')"><path d="M-6 -4v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#6b5a3e" stroke-width="2.6"/><rect x="-9" y="-4" width="18" height="14" rx="3" fill="#6b5a3e"/><circle cx="0" cy="2" r="2" fill="#e3d6b6"/></g>';
+    svg += '<circle cx="' + (x - r * .78) + '" cy="' + (y - r * .78) + '" r="10" fill="' + (open ? '#2c6fe0' : '#9a8b6c') + '"/><text x="' + (x - r * .78) + '" y="' + (y - r * .78 + 4.5) + '" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="13" fill="#fff">' + n + '</text>';
+    if (stars) {   // conquered: flag beside it and stars underneath
+      const fx = x + r + 7, fy = y + 6;
+      svg += '<path d="M' + fx + ' ' + fy + 'v-30" stroke="#6f4b20" stroke-width="2"/><path d="M' + fx + ' ' + (fy - 30) + 'q9 3 17 1q-4 5 0 10q-8 2 -17 -1z" fill="#ff5d4a"/>';
+      for (let k = 0; k < 3; k++) svg += '<path d="' + starPath(x + (k - 1) * 15, y + r + 12 - (k === 1 ? 2 : 0), 7) + '" fill="' + (k < stars ? '#f4b92e' : '#d8c79d') + '" stroke="#b07f35" stroke-width="1"/>';
+    } else if (isNext) {
+      svg += '<rect x="' + (x - 22) + '" y="' + (y + r + 3) + '" width="44" height="18" rx="9" fill="#ff5d4a"/><text x="' + x + '" y="' + (y + r + 16) + '" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="12" fill="#fff">' + (n <= LEVELS_READY ? 'Jugar' : 'Pronto') + '</text>';
+    }
+    svg += '</g>';
+  }
+  svg += '</svg>';
+  $('map').innerHTML = svg;
+}
+function mapMessage(txt) { const m = $('mapMsg'); m.textContent = txt; m.hidden = false; clearTimeout(msgT); msgT = setTimeout(() => { m.hidden = true; }, 2200); }
+function startLevel(n) {
+  audioOn(); currentLevel = n; $('start').hidden = true; newGame(); mode = 'play';
+}
+$('map').addEventListener('click', e => {
+  const g = e.target.closest('.lvl'); if (!g) return;
+  const n = +g.dataset.lvl;
+  if (!unlocked(n)) mapMessage('Conquista el nivel ' + (n - 1) + ' para abrir este castillo.');
+  else if (n > LEVELS_READY) mapMessage('El nivel ' + n + ' está en obras: ¡llega pronto!');
+  else startLevel(n);
+});
+$('helpBtn').addEventListener('click', () => { $('help').hidden = false; });
+$('helpClose').addEventListener('click', () => { $('help').hidden = true; });
+$('overMap').addEventListener('click', () => { $('over').hidden = true; newGame(); showStart(); });
 function pause() {
   if (mode !== 'play' || S.over) return;
   mode = 'pause'; joy.on = false; joy.vx = joy.vy = 0; joyDom(); keys.clear();
@@ -589,7 +678,6 @@ function dig() {
 $('dig').addEventListener('click', () => { audioOn(); dig(); });
 $('shopClose').addEventListener('click', () => { audioOn(); closeShop(); });
 function resume() { audioOn(); if (mode === 'pause') { mode = 'play'; $('paused').hidden = true; } }
-$('play').addEventListener('click', () => { audioOn(); $('start').hidden = true; newGame(); mode = 'play'; });
 $('pauseBtn').addEventListener('click', () => (mode === 'pause' ? resume() : pause()));
 $('resume').addEventListener('click', resume);
 $('quit').addEventListener('click', () => { newGame(); showStart(); });

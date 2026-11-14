@@ -12,6 +12,8 @@ Diego es el autor del juego. No es programador: decide el diseño y prueba, Clau
 ## El juego
 Defensa de un castillo de arena en la playa (inspirado en Kingshot). Un niño en bañador dispara bolas de arena automáticamente a los bebés que vienen a destrozar el castillo. Los bebés se van llorando y sueltan conchas. Las conchas se gastan en el menú de mejoras, que se abre solo al acabar cada oleada (la siguiente empieza al cerrarlo): cadencia, daño, alcance, imán de conchas, reclutar amigos que disparan desde agujeros, entrenarlos y reparar. Un nivel son 10 oleadas (`LEVEL_WAVES`); en la última sale un bebé jefe a mitad de oleada y al vencerlo el nivel queda conquistado con 1 a 3 estrellas (3: el castillo no recibió ningún golpe; 2: no se reparó; 1: el resto), guardadas en el navegador. Cada amigo reclutado lo coloca el jugador antes de la siguiente oleada: lleva al niño al sitio y pulsa "Cavar aquí" (solo entre el castillo y el mar, fuera de la orilla y a 2,5 m o más de otro amigo). Las conchas hay que recogerlas; al acabar la oleada hay 3 s y las que quedan se pierden. No hay recuadros en el suelo (se probaron y se quitaron). No hay muralla (se quitó a petición de Diego).
 
+La pantalla inicial es el recorrido de niveles: castillos cada vez más grandes unidos por un camino (`LEVELS`, `MAP_NODES`, `castleSvg`, `drawMap`). Los conquistados llevan bandera y estrellas; el siguiente brilla; los cerrados llevan candado. `LEVELS_READY` dice cuántos niveles tienen contenido (de momento 1; los demás abiertos dicen «Próximamente»). Abajo: Instrucciones, Sonido y versión.
+
 ## Estructura
 - `index.html`: página y capas de interfaz (marcador, carteles, fin de partida).
 - `css/style.css`: estilos.
