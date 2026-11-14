@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 27 · 14 nov 2026';
+const VERSION = 'Versión 28 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -186,10 +186,7 @@ function drawKid(x, y, o) {
     ctx.fillStyle = '#e9c46a'; ell(0.5, -45.5, 13, 3.6); ctx.fill(); ctx.strokeStyle = '#c49a3c'; ctx.lineWidth = .8; ctx.stroke();
     ctx.fillStyle = '#efcf7c'; ctx.beginPath(); ctx.ellipse(0.5, -46, 7, 6, 0, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#e0453f'; ctx.fillRect(-6.5, -48, 14, 2);
-  } else {
-    ctx.fillStyle = o.hat; ctx.beginPath(); ctx.ellipse(1, -44, 8, 6.5, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
-    ell(5, -44, 7, 1.8); ctx.fill();
-  }
+  } else drawHeadwear(o.hat);
   // throwing arm
   const ang = o.kick > 0 ? -(1.2 + o.kick / .1 * 1.4) : -.3 + w * .3;   // 0 = hanging down, negative = forwards
   ctx.save(); ctx.translate(4.5, -31); ctx.rotate(ang); ctx.fillStyle = sk; rr(ctx, -1.8, 0, 3.6, 12, 1.8); ctx.fill();
@@ -255,20 +252,48 @@ function drawHole(x, y) {
   ctx.fillStyle = '#c99d55'; ell(x, y + 1, 14, 7.5); ctx.fill();
   ctx.fillStyle = '#4f3718'; ell(x, y, 10.5, 5.5); ctx.fill();
 }
-// Friends hide in their hole, camouflaged: only a sand-coloured hat with seaweed and the eyes show.
-// They pop up for a moment to throw and duck again.
-const FRIEND_HAT = '#d4ae68';
+// Friends' headwear, drawn in the kid's own coordinates (head centre at 1,-40, facing +x).
+function drawHeadwear(h) {
+  const c = h.c, c2 = h.c2;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (h.type === 'cap' || h.type === 'capBack') {           // baseball cap, visor forwards or backwards
+    const vx = h.type === 'cap' ? 6.5 : -4.5;
+    ctx.fillStyle = c2; ell(vx, -44.2, 6.5, 1.9); ctx.fill();
+    ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(1, -43.5, 7.9, 6.8, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c2; ell(1, -50.2, 1.3, 1); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(1, -50); ctx.lineTo(1, -44); ctx.stroke();
+  } else if (h.type === 'snorkel') {                        // diving mask and tube
+    ctx.fillStyle = h.hair; ctx.beginPath(); ctx.ellipse(1, -42.5, 7.6, 5.6, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = c2; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-6.4, -41); ctx.lineTo(2, -41.5); ctx.stroke();
+    ctx.fillStyle = c; rr(ctx, 1.5, -44.5, 8.5, 6, 2.5); ctx.fill();
+    ctx.fillStyle = 'rgba(170,230,255,.85)'; rr(ctx, 2.7, -43.4, 6.1, 3.8, 1.6); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(3.5, -42.9, 1.4, 1.1);
+    ctx.strokeStyle = c; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(5, -36.5); ctx.quadraticCurveTo(-7, -35, -6.5, -44); ctx.lineTo(-6.5, -55); ctx.stroke();
+    ctx.strokeStyle = c2; ctx.beginPath(); ctx.moveTo(-6.5, -53); ctx.lineTo(-6.5, -56.5); ctx.stroke();
+  } else if (h.type === 'sunhat') {                         // wide floppy hat with a flower
+    ctx.fillStyle = c; ell(0.5, -45, 12.5, 3.4); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0.5, -45.5, 6.6, 5.6, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c2; ctx.fillRect(-6, -47.3, 13, 1.8);
+    ctx.fillStyle = '#fff'; for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; ell(6 + Math.cos(a) * 1.5, -47.5 + Math.sin(a) * 1.5, 1.1, 1.1); ctx.fill(); }
+    ctx.fillStyle = '#ffd23f'; ell(6, -47.5, .9, .9); ctx.fill();
+  } else if (h.type === 'bucket') {                         // fisherman's bucket hat
+    ctx.fillStyle = c2; ctx.beginPath(); ctx.moveTo(-9.5, -42); ctx.lineTo(11.5, -42); ctx.lineTo(8.5, -45.5); ctx.lineTo(-6.5, -45.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(-6.5, -45); ctx.lineTo(-5, -51); ctx.quadraticCurveTo(1, -53, 7, -51); ctx.lineTo(8.5, -45); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c2; ctx.fillRect(-6, -47.3, 14, 1.4);
+  } else {                                                  // hair with a headband
+    ctx.fillStyle = h.hair; ctx.beginPath(); ctx.ellipse(1, -42, 8, 6.4, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+    for (let k = 0; k < 4; k++) { ell(-5 + k * 3.6, -47.6 + (k % 2) * .8, 2.4, 2.2); ctx.fill(); }
+    ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(1, -43, 7.8, 2.4, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+    ctx.fillStyle = c2; ell(-6.6, -42.6, 1.6, 1.6); ctx.fill();
+  }
+}
+// Friends hide in their hole: only the head and headwear show. They pop up for a moment to throw.
 function drawFriend(f, now) {
   const e = 1 - Math.pow(1 - f.pop, 3), up = Math.min(1, f.show / .15);
   const depth = 33 - 14 * up + Math.sin(now * 2 + f.x) * .5;
   ctx.save(); ctx.beginPath(); ctx.rect(f.x - 24, f.y - 70, 48, 70); ctx.ellipse(f.x, f.y, 10.5, 5.5, 0, 0, Math.PI); ctx.clip();
-  drawKid(f.x, f.y + depth, { s: .9 * Math.max(.01, e), aim: f.aim, moving: false, walk: 0, kick: f.kick, skin: f.skin, skinD: f.skinD, trunk: f.trunk, hat: FRIEND_HAT });
+  drawKid(f.x, f.y + depth, { s: .9 * Math.max(.01, e), aim: f.aim, moving: false, walk: 0, kick: f.kick, skin: f.skin, skinD: f.skinD, trunk: f.trunk, hat: f.hat });
   ctx.restore();
-  // seaweed on the hat
-  const hy = f.y + depth - 45 * .9 * e;
-  ctx.strokeStyle = '#5f8f3e'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(f.x - 3, hy + 1); ctx.quadraticCurveTo(f.x - 7, hy - 3, f.x - 5, hy - 7);
-  ctx.moveTo(f.x + 1, hy); ctx.quadraticCurveTo(f.x + 4, hy - 4, f.x + 2, hy - 8); ctx.stroke();
   // rim of the hole with a little sand piled up
   ctx.fillStyle = '#c99d55'; ctx.beginPath(); ctx.ellipse(f.x, f.y + 1, 14, 7.5, 0, 0, Math.PI); ctx.ellipse(f.x, f.y + 1, 10.5, 4.5, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#d9b373'; ell(f.x - 9, f.y + 4, 4, 2.4); ctx.fill(); ell(f.x + 8, f.y + 5, 3.5, 2); ctx.fill();
@@ -439,7 +464,16 @@ function updateHud() {
   fill.style.width = (f * 100) + '%'; fill.classList.toggle('low', f < .3);
   $('shellNo').textContent = S.shells;
 }
-const FRIEND_LOOK = [['#e0457b', '#7bd389'], ['#2fb86a', '#ff8a3c'], ['#8e5bd9', '#3dc8e8'], ['#ff8a3c', '#e0457b'], ['#3dc8e8', '#ffd23f'], ['#7bd389', '#8e5bd9']];
+// One look per friend, in recruiting order: swimsuit, headwear and skin.
+const FRIEND_LOOK = [
+  { trunk: '#e0457b', hat: { type: 'cap', c: '#2c6fe0', c2: '#1d4fa8' }, skin: 0 },
+  { trunk: '#2fb86a', hat: { type: 'snorkel', c: '#ff8a3c', c2: '#ffd23f', hair: '#3b2814' }, skin: 2 },
+  { trunk: '#8e5bd9', hat: { type: 'sunhat', c: '#f6e3a8', c2: '#e0457b' }, skin: 1 },
+  { trunk: '#ff8a3c', hat: { type: 'bucket', c: '#7bd389', c2: '#3d9a5a' }, skin: 3 },
+  { trunk: '#3dc8e8', hat: { type: 'capBack', c: '#e0453f', c2: '#a8302a' }, skin: 1 },
+  { trunk: '#ffd23f', hat: { type: 'band', c: '#8e5bd9', c2: '#e0457b', hair: '#c8642b' }, skin: 0 }
+];
+const FRIEND_SKIN = [['#ffd0a8', '#e8b38a'], ['#f0b48a', '#d9976a'], ['#d99a6c', '#b97d52'], ['#a86b45', '#8a5634']];
 const COLLECT_TIME = 6;                   // seconds to pick up shells after the last baby of a wave
 // Friends are placed by the player before the next wave: the kid walks to the spot and digs.
 // Allowed: between the castle and the sea (where the babies come from), off the shore, not on the
@@ -453,10 +487,10 @@ function spotProblem(x, y) {
   return '';
 }
 function recruit(x, y) {
-  const j = S.friends.length, h = { x, y }, c = FRIEND_LOOK[j], dark = j % 2 === 1;
+  const j = S.friends.length, h = { x, y }, L = FRIEND_LOOK[j % FRIEND_LOOK.length], sk = FRIEND_SKIN[L.skin];
   puff(h.x, h.y, 4, 16, '#d6ae66');
   S.friends.push({ x: h.x, y: h.y, cd: rnd(0, .6), aim: -Math.PI / 2, kick: 0, pop: 0, show: 0,
-    trunk: c[0], hat: c[1], skin: dark ? '#d99a6c' : '#ffd0a8', skinD: dark ? '#b97d52' : '#e8b38a' });
+    trunk: L.trunk, hat: L.hat, skin: sk[0], skinD: sk[1] });
 }
 
 /* ---------- input ---------- */
