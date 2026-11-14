@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 32 · 14 nov 2026';
+const VERSION = 'Versión 33 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -199,7 +199,7 @@ const SKINS = ['#ffdcc2', '#f6c7a1', '#e0a878', '#b9784c', '#8a5634'];
 const HAIRS = ['#3b2814', '#6b3e1f', '#c8642b', '#e9c46a', '#1f1a17'];
 // Babies: kawaii, no hat, head a bit flat underneath, mouth set between the eyes.
 function drawBaby(b) {
-  const crawl = b.type === 'crawl', cry = b.state === 'cry', sc = b.type === 'big' ? 1.45 : crawl ? .95 : 1;
+  const crawl = b.type === 'crawl', cry = b.state === 'cry', sc = TYPES[b.type].sc;
   const rate = cry ? 22 : (crawl ? 16 : 9), sw = Math.sin(b.t * rate), bob = Math.abs(sw) * 1.5;
   const f = b.flash > 0 ? b.flash / .12 : 0, sk = tint(b.skin, f), skD = tint(b.skinD, f), dia = tint('#ffffff', f);
   ctx.save(); ctx.translate(b.x, b.y); ctx.scale(sc, sc); ctx.rotate(sw * (cry ? .08 : .05));
@@ -244,8 +244,17 @@ function drawBaby(b) {
     ctx.beginPath(); ctx.arc(-.8, cy + 1.4, .8, .2, Math.PI - .2); ctx.arc(.8, cy + 1.4, .8, .2, Math.PI - .2); ctx.stroke();
   }
   ctx.fillStyle = 'rgba(255,130,150,.55)'; ell(-7.2, cy + 3.4, 1.9, 1.1); ctx.fill(); ell(7.2, cy + 3.4, 1.9, 1.1); ctx.fill();
+  if (b.type === 'boss') {      // golden crown, and a dummy while he is not crying
+    ctx.fillStyle = tint('#ffcc33', f); ctx.strokeStyle = '#c8901a'; ctx.lineWidth = .7; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(-6, cy - 7.5); ctx.lineTo(-6.5, cy - 13); ctx.lineTo(-3.2, cy - 10.2); ctx.lineTo(0, cy - 14.5); ctx.lineTo(3.2, cy - 10.2); ctx.lineTo(6.5, cy - 13); ctx.lineTo(6, cy - 7.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e0453f'; ell(0, cy - 9.5, 1, 1); ctx.fill(); ctx.fillStyle = '#3dc8e8'; ell(-4, cy - 9, .8, .8); ctx.fill(); ell(4, cy - 9, .8, .8); ctx.fill();
+    if (!cry) {
+      ctx.fillStyle = '#7bc8f0'; ell(0, cy + 2.6, 3, 1.6); ctx.fill();
+      ctx.strokeStyle = '#ff7aa2'; ctx.lineWidth = .9; ctx.beginPath(); ctx.arc(0, cy + 4.6, 1.5, 0, TAU); ctx.stroke();
+    }
+  }
   ctx.restore();
-  if (b.state === 'walk' && b.hp < b.max) {
+  if (b.state === 'walk' && b.hp < b.max && b.type !== 'boss') {
     const top = b.y + (cy - 11) * sc, fr = clamp(b.hp / b.max, .02, 1);
     ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(ctx, b.x - 11, top - 4, 22, 4, 2); ctx.fill();
     ctx.fillStyle = '#ff5d4a'; rr(ctx, b.x - 10.5, top - 3.5, 21 * fr, 3, 1.5); ctx.fill();
@@ -388,10 +397,13 @@ setMuted(muted);
 // Tuned with simulated games (14 nov 2026): a player who buys well and picks up shells beats wave 10 about 7 times in 10;
 // one who doesn't chase shells doesn't get past wave 6.
 const TYPES = {
-  normal: { hp: 4,  sp: 34, r: 11, drop: 1,   conch: 0, atk: 3, rate: .9 },
-  crawl:  { hp: 3,  sp: 62, r: 9,  drop: .7,  conch: 0, atk: 2, rate: .6 },
-  big:    { hp: 14, sp: 22, r: 16, drop: 1.8, conch: 3, atk: 9, rate: 1.1 }
+  normal: { hp: 4,  sp: 34, r: 11, drop: 1,   conch: 0, atk: 3, rate: .9,  sc: 1 },
+  crawl:  { hp: 3,  sp: 62, r: 9,  drop: .7,  conch: 0, atk: 2, rate: .6,  sc: .95 },
+  big:    { hp: 14, sp: 22, r: 16, drop: 1.8, conch: 3, atk: 9, rate: 1.1, sc: 1.45 },
+  // the boss comes once, halfway through the last wave of the level
+  boss:   { hp: 110, sp: 13, r: 27, drop: 0,  conch: 0, atk: 10, rate: 1.5, sc: 2.6 }
 };
+const LEVEL_WAVES = 10;                   // waves per level; the last one brings the boss
 const UPG = {
   rate:  { name: 'Cadencia', base: 8,  g: 1.4,  max: 10, val: l => 1.6 + .45 * l,  fmt: v => f1(v) + ' bolas/s' },
   power: { name: 'Daño',     base: 10, g: 1.4,  max: 10, val: l => 2 + .6 * l,     fmt: v => 'daño ' + f1(v) },
@@ -432,7 +444,7 @@ function buy(id) {
   if (UPG[id]) S.up[id]++;
   else if (id === 'friend') S.pending++;
   else if (id === 'train') S.friendLvl++;
-  else S.hp = Math.min(100, S.hp + 35);
+  else { S.hp = Math.min(100, S.hp + 35); S.repaired = true; }
   updateHud(); sfx('buy'); puff(S.player.x, S.player.y, 30, 14, '#fff3b0'); drawShop();
 }
 const SHELL_SVG = '<svg class="ic"><use href="#shell"/></svg>';
@@ -455,15 +467,17 @@ function newGame() {
   ents.babies = []; ents.balls = []; ents.drops = []; $('place').hidden = true;
   S = {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
-    over: false, shake: 0, bump: 0, hint: 9,
+    over: false, shake: 0, bump: 0, hint: 9, hit: false, repaired: false, bossAt: -1,
     up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0, pending: 0,
     player: { x: CX, y: 540, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
   startWave(1); updateHud(); followCam();
 }
 function startWave(n) {
-  S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; S.bannerTxt = 'Oleada ' + n; sfx('wave');
-  $('waveNo').textContent = n;
+  S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; sfx('wave');
+  S.bossAt = n === LEVEL_WAVES ? Math.floor(S.spawnLeft / 2) : -1;     // the boss joins halfway through the last wave
+  S.bannerTxt = n === LEVEL_WAVES ? '¡Última oleada!' : 'Oleada ' + n;
+  $('waveNo').textContent = n + '/' + LEVEL_WAVES;
 }
 function updateHud() {
   const f = clamp(S.hp / 100, 0, 1), fill = $('hpFill');
@@ -588,6 +602,22 @@ addEventListener('keydown', e => {
 });
 
 const bebes = n => n + (n === 1 ? ' bebé' : ' bebés');
+// Level progress (stars per level) is kept in the browser.
+let progress = {};
+try { progress = JSON.parse(localStorage.getItem('castillo-arena-levels') || '{}') || {}; } catch (e) {}
+function win() {
+  // 3 stars: the castle never took a hit; 2: it took hits but was never repaired; 1: otherwise
+  const stars = !S.hit ? 3 : !S.repaired ? 2 : 1, level = S.level || 1, prev = progress[level] || 0;
+  progress[level] = Math.max(prev, stars);
+  try { localStorage.setItem('castillo-arena-levels', JSON.stringify(progress)); } catch (e) {}
+  mode = 'won'; joy.on = false; joy.vx = joy.vy = 0; joyDom(); sfx('clear');
+  $('wonTitle').textContent = '¡Nivel ' + level + ' conquistado!';
+  document.querySelectorAll('#wonStars i').forEach((e, i) => e.classList.toggle('on', i < stars));
+  $('wonTxt').textContent = (stars === 3 ? 'Perfecto: el castillo no ha recibido ni un golpe.' : stars === 2 ? 'El castillo ha aguantado sin reparaciones.' : 'Conquistado, aunque has tenido que reparar el castillo.')
+    + (stars > prev && prev ? ' ¡Mejoras tu marca!' : '');
+  $('won').hidden = false;
+}
+$('wonBack').addEventListener('click', () => { $('won').hidden = true; newGame(); showStart(); });
 function gameOver() {
   S.over = true; sfx('over'); joy.on = false; joy.vx = joy.vy = 0; joyDom();
   const newWave = S.wave > best, newKills = S.kills > bestKills;
@@ -600,17 +630,18 @@ function gameOver() {
 }
 
 /* ---------- simulation ---------- */
-function spawnBaby() {
+function spawnBaby(boss) {
   const n = S.wave, r = Math.random();
   const pBig = n >= 3 ? Math.min(.3, (n - 2) * .06) : 0, pCr = n >= 2 ? Math.min(.35, (n - 1) * .08) : 0;
-  const type = r < pBig ? 'big' : (r < pBig + pCr ? 'crawl' : 'normal');
+  const type = boss ? 'boss' : r < pBig ? 'big' : (r < pBig + pCr ? 'crawl' : 'normal');
   const T = TYPES[type], hs = 1 + .12 * (n - 1);
   let x, y;
-  if (Math.random() < .7) { x = 24 + Math.random() * (W - 48); y = 66; }
+  if (boss) { x = CX + rnd(-120, 120); y = 60; }
+  else if (Math.random() < .7) { x = 24 + Math.random() * (W - 48); y = 66; }
   else { x = Math.random() < .5 ? -12 : W + 12; y = 90 + Math.random() * 200; }
   const skin = SKINS[Math.floor(Math.random() * SKINS.length)];
   ents.babies.push({ type, x, y, hp: T.hp * hs, max: T.hp * hs, sp: T.sp * (.9 + Math.random() * .2), r: T.r,
-    skin, skinD: darken(skin), hair: Math.floor(Math.random() * 4), hairC: HAIRS[Math.floor(Math.random() * HAIRS.length)],
+    skin, skinD: darken(skin), hair: boss ? 0 : Math.floor(Math.random() * 4), hairC: HAIRS[Math.floor(Math.random() * HAIRS.length)],
     state: 'walk', flash: 0, t: Math.random() * 6, atkT: Math.random() * .5, rate: T.rate, atk: T.atk, cryT: 0, fx: 0, fy: 0 });
 }
 function darken(hex) {
@@ -631,7 +662,7 @@ function die(b) {
   if (Math.random() < .6) floatText(['¡Buaaa!', '¡Uaaa!', '¡Buaaaa!'][Math.floor(Math.random() * 3)], b.x, b.y, 44);
 }
 function hitCastle(d) {
-  S.hp = Math.max(0, S.hp - d); S.shake = .25; sfx('castle');
+  S.hp = Math.max(0, S.hp - d); S.shake = .25; S.hit = true; sfx('castle');
   puff(CX + rnd(-40, 40) * CS, CY + 8 * CS, 30, 3, '#d9b873'); updateHud();
   if (S.hp <= 0) gameOver();
 }
@@ -703,7 +734,7 @@ function update(dt) {
         if (b.state !== 'walk') continue;
         if (Math.hypot(b.x - bl.x, b.y - bl.y) < b.r + 4) {
           b.hp -= bl.dmg; b.flash = .12;
-          const l = Math.hypot(bl.vx, bl.vy); b.x += bl.vx / l * 3; b.y += bl.vy / l * 3;
+          const l = Math.hypot(bl.vx, bl.vy), kb = b.type === 'boss' ? 0 : 3; b.x += bl.vx / l * kb; b.y += bl.vy / l * kb;
           puff(bl.x, bl.y, 20, 5, '#d4ad6a'); sfx('hit');
           if (b.hp <= 0) die(b);
           gone = true; break;
@@ -750,8 +781,10 @@ function update(dt) {
   else if (S.spawnLeft > 0) {
     S.spawnT -= dt;
     if (S.spawnT <= 0) { spawnBaby(); S.spawnLeft--; S.spawnT = Math.max(.45, 1.5 - .07 * S.wave) * (.7 + Math.random() * .6); }
+    if (S.spawnLeft === S.bossAt) { S.bossAt = -1; spawnBaby(true); S.banner = 2.2; S.bannerTxt = '¡Llega el bebé jefe!'; sfx('castle'); }
   } else if (S.gap === null) {
-    if (!ents.babies.some(b => b.state === 'walk')) { S.gap = COLLECT_TIME; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; sfx('clear'); }
+    if (!ents.babies.some(b => b.state === 'walk') && S.wave >= LEVEL_WAVES) win();
+    else if (!ents.babies.some(b => b.state === 'walk')) { S.gap = COLLECT_TIME; S.banner = 1.8; S.bannerTxt = '¡Oleada superada!'; sfx('clear'); }
   } else {
     // a few seconds to pick up the shells left on the sand; whatever is left is lost
     S.gap -= dt;
@@ -799,7 +832,7 @@ function render(now) {
   // shadows on the sand
   ctx.fillStyle = 'rgba(90,60,20,.22)';
   ell(p.x, p.y, 10, 3.6); ctx.fill();
-  for (const b of ents.babies) { const sc = b.type === 'big' ? 1.45 : 1; ell(b.x, b.y, 8.5 * sc, 3.2 * sc); ctx.fill(); }
+  for (const b of ents.babies) { const sc = TYPES[b.type].sc; ell(b.x, b.y, 8.5 * sc, 3.2 * sc); ctx.fill(); }
   for (const bl of ents.balls) { ell(bl.x, bl.y, 3, 1.3); ctx.fill(); }
 
   for (const f of S.friends) drawHole(f.x, f.y);
@@ -850,6 +883,9 @@ function render(now) {
   drawOffscreen();
 
   // DOM overlays
+  const boss = ents.babies.find(b => b.type === 'boss' && b.state === 'walk'), bb = $('bossBar');
+  if (bb.hidden !== !boss) bb.hidden = !boss;
+  if (boss) $('bossFill').style.width = clamp(boss.hp / boss.max, 0, 1) * 100 + '%';
   $('shellChip').style.transform = S.bump > 0 ? 'scale(' + (1 + S.bump * .6) + ')' : '';
   const bn = $('banner');
   if (S.banner > 0 && !S.over && mode === 'play') { const a = Math.min(1, S.banner / .5); bn.textContent = S.bannerTxt; bn.style.opacity = a; bn.style.transform = 'scale(' + (1 + (1 - a) * .15) + ')'; } else bn.style.opacity = 0;
