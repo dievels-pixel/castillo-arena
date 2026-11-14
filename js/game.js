@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 26 · 14 nov 2026';
+const VERSION = 'Versión 27 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -444,7 +444,7 @@ const COLLECT_TIME = 6;                   // seconds to pick up shells after the
 // Friends are placed by the player before the next wave: the kid walks to the spot and digs.
 // Allowed: between the castle and the sea (where the babies come from), off the shore, not on the
 // castle and never next to another friend.
-const FRIEND_GAP = 150;
+const FRIEND_GAP = 50;                     // minimum distance between two friends' holes (2,5 m)
 function spotProblem(x, y) {
   if (y < SEA_Y + 60) return 'Demasiado cerca del mar';
   if (((x - CX) / (115 * CS)) ** 2 + ((y - CY) / (55 * CS)) ** 2 < 1) return 'Encima del castillo no';
