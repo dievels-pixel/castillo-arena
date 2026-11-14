@@ -9,13 +9,13 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 30 · 14 nov 2026';
+const VERSION = 'Versión 31 · 14 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
    View: fixed top-down tilted camera; a thing's height above the sand is drawn upwards (y - h). ---------- */
 const VW = 360, VH = 640;                 // what the screen shows
-const W = 600, H = 760;                   // the whole beach; the camera follows the kid
+const W = 600, H = 640;                   // the whole beach (as tall as the screen: no beach behind the castle); the camera follows the kid sideways
 const CS = .75;                           // castle scale (1 = original size)
 const CX = 300, CY = 440, CR = Math.round(62 * CS);   // castle centre and its attack radius
 const SEA_Y = 56;                         // shoreline
@@ -76,7 +76,7 @@ function buildBg() {
     t.fillStyle = r() < .5 ? 'rgba(150,110,50,.16)' : 'rgba(255,248,222,.45)';
     t.beginPath(); t.arc(r() * W, SEA_Y + r() * (H - SEA_Y), .4 + r() * .8, 0, TAU); t.fill();
   }
-  const rocks = [[40, 130, 1], [560, 150, 0], [30, 330, 2], [575, 340, 1], [150, 200, 0], [440, 240, 2], [70, 520, 1], [540, 500, 0], [90, 700, 2], [520, 690, 1], [300, 735, 0]];
+  const rocks = [[40, 130, 1], [560, 150, 0], [30, 330, 2], [575, 340, 1], [150, 200, 0], [440, 240, 2], [70, 520, 1], [540, 500, 0], [110, 610, 2], [500, 600, 1]];
   rocks.forEach(([x, y, k]) => {
     const z = 6 + k * 2.5;
     t.fillStyle = 'rgba(90,60,20,.2)'; t.beginPath(); t.ellipse(x + 1, y + 1, z * 1.3, z * .5, 0, 0, TAU); t.fill();
@@ -85,7 +85,7 @@ function buildBg() {
     t.fillStyle = 'rgba(255,255,255,.22)'; t.beginPath(); t.moveTo(x - z * .7, y - z * .9); t.lineTo(x + z * .3, y - z * 1.1); t.lineTo(x - z * .1, y - z * .4); t.closePath(); t.fill();
   });
   // starfish
-  [[120, 420, .3], [490, 600, 1.2], [210, 690, 2.1], [560, 260, .8]].forEach(([x, y, a]) => {
+  [[120, 420, .3], [430, 590, 1.2], [210, 600, 2.1], [560, 260, .8]].forEach(([x, y, a]) => {
     t.save(); t.translate(x, y); t.rotate(a); t.fillStyle = '#f08a5d'; t.beginPath();
     for (let k = 0; k < 10; k++) { const r2 = k % 2 ? 2.6 : 7, an = k / 10 * TAU - Math.PI / 2; t.lineTo(Math.cos(an) * r2, Math.sin(an) * r2 * .7); }
     t.closePath(); t.fill(); t.restore();
@@ -454,7 +454,7 @@ function newGame() {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
     over: false, shake: 0, bump: 0, hint: 9,
     up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0, pending: 0,
-    player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
+    player: { x: CX, y: 540, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
   startWave(1); updateHud(); followCam();
 }
