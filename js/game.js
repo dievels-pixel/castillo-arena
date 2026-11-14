@@ -252,12 +252,23 @@ function drawHole(x, y) {
   ctx.fillStyle = '#c99d55'; ell(x, y + 1, 14, 7.5); ctx.fill();
   ctx.fillStyle = '#4f3718'; ell(x, y, 10.5, 5.5); ctx.fill();
 }
+// Friends hide in their hole, camouflaged: only a sand-coloured hat with seaweed and the eyes show.
+// They pop up for a moment to throw and duck again.
+const FRIEND_HAT = '#d4ae68';
 function drawFriend(f, now) {
-  const e = 1 - Math.pow(1 - f.pop, 3);
+  const e = 1 - Math.pow(1 - f.pop, 3), up = Math.min(1, f.show / .15);
+  const depth = 33 - 14 * up + Math.sin(now * 2 + f.x) * .5;
   ctx.save(); ctx.beginPath(); ctx.rect(f.x - 24, f.y - 70, 48, 70); ctx.ellipse(f.x, f.y, 10.5, 5.5, 0, 0, Math.PI); ctx.clip();
-  drawKid(f.x, f.y + 13 + Math.sin(now * 2 + f.x) * .6, { s: .9 * Math.max(.01, e), aim: f.aim, moving: false, walk: 0, kick: f.kick, skin: f.skin, skinD: f.skinD, trunk: f.trunk, hat: f.hat });
+  drawKid(f.x, f.y + depth, { s: .9 * Math.max(.01, e), aim: f.aim, moving: false, walk: 0, kick: f.kick, skin: f.skin, skinD: f.skinD, trunk: f.trunk, hat: FRIEND_HAT });
   ctx.restore();
+  // seaweed on the hat
+  const hy = f.y + depth - 45 * .9 * e;
+  ctx.strokeStyle = '#5f8f3e'; ctx.lineWidth = 1.4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(f.x - 3, hy + 1); ctx.quadraticCurveTo(f.x - 7, hy - 3, f.x - 5, hy - 7);
+  ctx.moveTo(f.x + 1, hy); ctx.quadraticCurveTo(f.x + 4, hy - 4, f.x + 2, hy - 8); ctx.stroke();
+  // rim of the hole with a little sand piled up
   ctx.fillStyle = '#c99d55'; ctx.beginPath(); ctx.ellipse(f.x, f.y + 1, 14, 7.5, 0, 0, Math.PI); ctx.ellipse(f.x, f.y + 1, 10.5, 4.5, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#d9b373'; ell(f.x - 9, f.y + 4, 4, 2.4); ctx.fill(); ell(f.x + 8, f.y + 5, 3.5, 2); ctx.fill();
 }
 
 /* ---------- particles (sand puffs) ---------- */
@@ -441,7 +452,7 @@ function spotProblem(x, y) {
 function recruit(x, y) {
   const j = S.friends.length, h = { x, y }, c = FRIEND_LOOK[j], dark = j % 2 === 1;
   puff(h.x, h.y, 4, 16, '#d6ae66');
-  S.friends.push({ x: h.x, y: h.y, cd: rnd(0, .6), aim: -Math.PI / 2, kick: 0, pop: 0,
+  S.friends.push({ x: h.x, y: h.y, cd: rnd(0, .6), aim: -Math.PI / 2, kick: 0, pop: 0, show: 0,
     trunk: c[0], hat: c[1], skin: dark ? '#d99a6c' : '#ffd0a8', skinD: dark ? '#b97d52' : '#e8b38a' });
 }
 
@@ -630,11 +641,11 @@ function update(dt) {
 
   // friends
   for (const f of S.friends) {
-    f.pop = Math.min(1, f.pop + dt * 3); f.kick = Math.max(0, f.kick - dt); f.cd -= dt;
+    f.pop = Math.min(1, f.pop + dt * 3); f.kick = Math.max(0, f.kick - dt); f.show = Math.max(0, f.show - dt); f.cd -= dt;
     const tg = nearest(f.x, f.y, F_RANGE);
     if (tg) f.aim = Math.atan2(tg.y - f.y, tg.x - f.x);
     if (f.cd <= 0) {
-      if (tg) { shoot(f.x + Math.cos(f.aim) * 8, f.y + Math.sin(f.aim) * 8, f.aim, fDmg(), F_RANGE + 40); f.kick = .1; f.cd = 1 / fRate(); }
+      if (tg) { shoot(f.x + Math.cos(f.aim) * 8, f.y + Math.sin(f.aim) * 8, f.aim, fDmg(), F_RANGE + 40); f.kick = .1; f.show = .45; f.cd = 1 / fRate(); }
       else f.cd = 0;
     }
   }
