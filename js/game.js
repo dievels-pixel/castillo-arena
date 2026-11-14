@@ -350,7 +350,8 @@ const TYPES = {
 const UPG = {
   rate:  { name: 'Cadencia', base: 8,  g: 1.4,  max: 10, val: l => 1.6 + .45 * l,  fmt: v => f1(v) + ' bolas/s' },
   power: { name: 'Daño',     base: 10, g: 1.4,  max: 10, val: l => 2 + .6 * l,     fmt: v => 'daño ' + f1(v) },
-  range: { name: 'Alcance',  base: 6,  g: 1.35, max: 8,  val: l => (175 + 14 * l) / 20, fmt: v => f1(v) + ' m' }
+  range: { name: 'Alcance',  base: 6,  g: 1.35, max: 8,  val: l => (175 + 14 * l) / 20, fmt: v => f1(v) + ' m' },
+  magnet: { name: 'Imán de conchas', base: 6, g: 1.35, max: 8, val: l => (78 + 16 * l) / 20, fmt: v => 'atrae a ' + f1(v) + ' m' }
 };
 const upCost = (u, l) => Math.ceil(u.base * Math.pow(u.g, l));
 const repairCost = () => 5 + 2 * S.wave;
@@ -361,7 +362,7 @@ let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause 
 try { best = +localStorage.getItem('castillo-arena-best') || 0; bestKills = +localStorage.getItem('castillo-arena-best-kills') || 0; } catch (e) {}
 
 /* ---------- upgrades menu (Mejoras button); the game waits while it is open ---------- */
-const SHOP = ['rate', 'power', 'range', 'friend', 'train', 'repair'];
+const SHOP = ['rate', 'power', 'range', 'magnet', 'friend', 'train', 'repair'];
 const amigos = n => n + (n === 1 ? ' amigo' : ' amigos');
 function itemState(id) {
   if (UPG[id]) {
@@ -410,7 +411,7 @@ function newGame() {
   S = {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
     over: false, shake: 0, bump: 0, hint: 9,
-    up: { rate: 0, power: 0, range: 0 }, friends: [], friendLvl: 0,
+    up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0,
     player: { x: CX, y: 580, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
   startWave(1); updateHud(); followCam();
@@ -665,8 +666,8 @@ function update(dt) {
   }
   ents.babies = ents.babies.filter(b => !(b.state === 'cry' && (b.cryT > 3.2 || b.x < -30 || b.x > W + 30 || b.y > H + 30 || b.y < 30)));
 
-  // drops (the magnet is built in; shells must be picked up during the game)
-  const magR = 78;
+  // drops (the magnet pulls shells within its radius; it can be upgraded)
+  const magR = 78 + 16 * S.up.magnet;
   for (let i = ents.drops.length - 1; i >= 0; i--) {
     const s = ents.drops[i]; s.t += dt;
     const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
