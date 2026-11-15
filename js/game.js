@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 42 · 15 nov 2026';
+const VERSION = 'Versión 43 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -26,8 +26,24 @@ const LEVEL_DEFS = {
   // level 2, tuned with simulated games: half the babies of level 1 but 50 % more shells each; a player who buys
   // well wins it about 1 time in 4 (level 1: about 6 in 10)
   2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.5,
-       shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] }
+       shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] },
+  // level 3: two castles set apart differently, sunshades, float babies and crabs that pinch the kid
+  3: { castles: [[180, 440], [420, 470]], float: true, count: .5, drop: 1.5, crabs: 5,
+       shades: [[180, 300, '#ffd23f'], [420, 330, '#e0457b'], [300, 230, '#3dc8e8']] }
 };
+// Crabs: step on one and it holds the kid for PINCH_TIME seconds (he still throws, but can't walk). 1,5 s is
+// about 9 m of running lost: it hurts without being maddening. Afterwards the kid has a moment to get away.
+const PINCH_TIME = 1.5, PINCH_FREE = 1, CRAB_REST = 4;
+function placeCrabs() {
+  const n = levelDef().crabs || 0, out = [], minY = SEA_Y + 70, maxY = Math.min(...levelDef().castles.map(c => c[1])) - 70;
+  for (let tries = 0; out.length < n && tries < 500; tries++) {
+    const x = 40 + Math.random() * (W - 80), y = minY + Math.random() * (maxY - minY);
+    if ((levelDef().shades || []).some(([sx, sy]) => Math.hypot(sx - x, sy - y) < SHADE_R + 25)) continue;
+    if (out.some(c => Math.hypot(c.hx - x, c.y - y) < 70)) continue;
+    out.push({ x, y, hx: x, ph: Math.random() * 6, cool: 0, hold: false });
+  }
+  return out;
+}
 let currentLevel = 1;
 const levelDef = () => LEVEL_DEFS[currentLevel] || LEVEL_DEFS[1];
 const CX = 300, CY = 440;                 // middle of the beach, where the castle of level 1 stands
@@ -396,7 +412,7 @@ function noise(dur, vol, freq, type) {
   src.buffer = noiseBuf; f.type = type || 'bandpass'; f.frequency.value = freq; env(g, t, vol, dur);
   src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .05);
 }
-const SFX_GAP = { thud: 80, throw: 70, hit: 45, cry: 200, pick: 40, pay: 90, castle: 120 };
+const SFX_GAP = { pinch: 300, thud: 80, throw: 70, hit: 45, cry: 200, pick: 40, pay: 90, castle: 120 };
 function sfx(name) {
   if (muted || !ac || ac.state !== 'running') return;
   const now = performance.now(); if (now - (lastSfx[name] || 0) < (SFX_GAP[name] || 0)) return; lastSfx[name] = now;
@@ -413,6 +429,7 @@ function sfx(name) {
     case 'castle': tone('sine', 95, 50, .2, .35); noise(.12, .1, 300, 'lowpass'); break;
     case 'pop': noise(.12, .3, 1800); tone('square', 900, 200, .12, .08); break;
     case 'thud': noise(.07, .1, 700); break;
+    case 'pinch': tone('square', 1200, 600, .06, .06); tone('square', 1300, 650, .06, .06, .09); break;
     case 'over': [392, 330, 262].forEach((f, i) => tone('triangle', f, f * .97, .32, .18, i * .3)); break;
   }
 }
@@ -505,6 +522,7 @@ function newGame() {
     over: false, shake: 0, bump: 0, hint: 9, level: currentLevel, hit: false, repaired: false, bossAt: -1,
     up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0, pending: 0,
     castles: levelDef().castles.map(([x, y]) => ({ x, y, hp: 100, shake: 0 })),
+    crabs: placeCrabs(), pinch: 0, pinchFree: 0,
     player: { x: levelDef().castles.reduce((a, c) => a + c[0], 0) / levelDef().castles.length, y: 540, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
   buildBg();
@@ -596,7 +614,7 @@ function showStart() {
 }
 
 /* ---------- start screen: the road of castles, one per level ---------- */
-const LEVELS = 5, LEVELS_READY = 2;   // levels shown on the map / levels that already have content
+const LEVELS = 5, LEVELS_READY = 3;   // levels shown on the map / levels that already have content
 const MAP_NODES = [[105, 418, 30], [250, 336, 33], [112, 250, 36], [252, 160, 40], [150, 70, 44]];  // x, y, radius in a 360x480 map
 let msgT = 0;
 const unlocked = n => n === 1 || (progress[n - 1] || 0) > 0;
@@ -842,6 +860,11 @@ function update(dt) {
     const ky = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
     if (kx || ky) { const l = Math.hypot(kx, ky); ix = kx / l; iy = ky / l; }
   }
+  if (S.pinch > 0) {                 // held by a crab: can't walk
+    S.pinch -= dt; ix = iy = 0;
+    if (S.pinch <= 0) { S.pinchFree = PINCH_FREE; for (const c of S.crabs) if (c.hold) { c.hold = false; c.cool = CRAB_REST; c.hx = clamp(c.x + (c.x < p.x ? -45 : 45), 30, W - 30); } }
+  }
+  S.pinchFree = Math.max(0, S.pinchFree - dt);
   const mag = Math.hypot(ix, iy);
   p.moving = mag > .05;
   p.x += ix * 118 * dt; p.y += iy * 118 * dt;
@@ -850,6 +873,15 @@ function update(dt) {
   for (const c of S.castles) {
     const pdx = p.x - c.x, pdy = p.y - c.y, pd = Math.hypot(pdx, pdy), pr = 66 * CS;
     if (pd < pr && pd > .01) { p.x = c.x + pdx / pd * pr; p.y = c.y + pdy / pd * pr; }
+  }
+  // crabs scuttle sideways around their spot; stepping on one gets the kid pinched
+  for (const c of S.crabs) {
+    c.cool = Math.max(0, c.cool - dt);
+    if (c.hold) { c.x = p.x + 7; c.y = p.y + 2; continue; }
+    const tx = c.hx + Math.sin(S.t * .8 + c.ph) * 30; c.x += clamp(tx - c.x, -40 * dt, 40 * dt);
+    if (S.pinch <= 0 && S.pinchFree <= 0 && c.cool <= 0 && Math.hypot(c.x - p.x, c.y - p.y) < 13) {
+      c.hold = true; S.pinch = PINCH_TIME; floatText('¡Ay!', p.x, p.y, 50); sfx('pinch');
+    }
   }
   for (const [sx, sy] of shades()) {     // sunshades are obstacles for the kid (babies crawl underneath)
     const pdx = p.x - sx, pdy = p.y - sy, pd = Math.hypot(pdx, pdy), pr = SHADE_R;
@@ -978,6 +1010,25 @@ function drawOffscreen() {
   }
 }
 
+function drawCrab(c, now) {
+  const walk = c.hold ? 0 : Math.sin(now * 14 + c.ph), clamp2 = c.hold ? Math.abs(Math.sin(now * 12)) : 0;
+  ctx.save(); ctx.translate(c.x, c.y);
+  ctx.fillStyle = 'rgba(90,60,20,.22)'; ell(0, 1, 9, 3); ctx.fill();
+  ctx.strokeStyle = '#b8352a'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+  for (let k = 0; k < 3; k++) { const yy = -2 + k * 1.6, w = k % 2 ? walk : -walk;
+    ctx.beginPath(); ctx.moveTo(-5, yy); ctx.lineTo(-9, yy + 2 + w); ctx.moveTo(5, yy); ctx.lineTo(9, yy + 2 - w); ctx.stroke(); }
+  ctx.fillStyle = '#e8553a'; ell(0, -3, 6.5, 4.2); ctx.fill();
+  ctx.fillStyle = '#f37a5f'; ell(-1.5, -4.5, 3, 1.4); ctx.fill();
+  for (const sd of [-1, 1]) {            // claws, snapping while they hold the kid
+    const cx = sd * 7.5, cy = -6 - clamp2 * 2;
+    ctx.fillStyle = '#e8553a'; ell(cx, cy, 2.8, 2.4); ctx.fill();
+    ctx.fillStyle = '#c94a33'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + sd * 2.8, cy - 1.8 - clamp2); ctx.lineTo(cx + sd * 1.2, cy - 2.6); ctx.closePath(); ctx.fill();
+  }
+  ctx.strokeStyle = '#b8352a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-2, -6); ctx.lineTo(-2.5, -9); ctx.moveTo(2, -6); ctx.lineTo(2.5, -9); ctx.stroke();
+  ctx.fillStyle = '#fff'; ell(-2.5, -9.5, 1.3, 1.3); ctx.fill(); ell(2.5, -9.5, 1.3, 1.3); ctx.fill();
+  ctx.fillStyle = '#222'; ell(-2.5, -9.5, .6, .6); ctx.fill(); ell(2.5, -9.5, .6, .6); ctx.fill();
+  ctx.restore();
+}
 function drawShade([sx, sy, col]) {      // pole and striped canopy
   const top = sy - 34;
   ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, top); ctx.stroke();
@@ -1001,6 +1052,10 @@ function render(now) {
   // shadows on the sand
   ctx.fillStyle = 'rgba(90,60,20,.22)';
   ell(p.x, p.y, 10, 3.6); ctx.fill();
+  if (S.pinch > 0) {                     // how long the crab will still hold on
+    ctx.strokeStyle = 'rgba(224,69,63,.85)'; ctx.lineWidth = 2.5; ctx.beginPath();
+    ctx.ellipse(p.x, p.y, 15, 6, 0, -Math.PI / 2, -Math.PI / 2 + TAU * S.pinch / PINCH_TIME); ctx.stroke();
+  }
   for (const b of ents.babies) { const sc = TYPES[b.type].sc; ell(b.x, b.y, 8.5 * sc, 3.2 * sc); ctx.fill(); }
   for (const bl of ents.balls) { ell(bl.x, bl.y, 3, 1.3); ctx.fill(); }
 
@@ -1032,6 +1087,7 @@ function render(now) {
   order.length = 0;
   for (const c of S.castles) order.push({ y: c.y + 16, k: 0, o: c });
   for (const sh of shades()) order.push({ y: sh[1] + SHADE_R * .62, k: 5, o: sh });   // covers whoever is under it
+  for (const c of S.crabs) order.push({ y: c.y + (c.hold ? 3 : 0), k: 6, o: c });
   for (const f of S.friends) order.push({ y: f.y, k: 2, o: f });
   for (const b of ents.babies) order.push({ y: b.y, k: 3, o: b });
   order.push({ y: p.y, k: 4 });
@@ -1039,6 +1095,7 @@ function render(now) {
   for (const e of order) {
     if (e.k === 0) drawCastle(e.o, now);
     else if (e.k === 5) drawShade(e.o);
+    else if (e.k === 6) drawCrab(e.o, now);
     else if (e.k === 2) drawFriend(e.o, now);
     else if (e.k === 3) drawBaby(e.o);
     else drawKid(p.x, p.y, Object.assign(KID_LOOK, { aim: p.aim, moving: p.moving, walk: p.walk, kick: p.kick }));
