@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 35 · 15 nov 2026';
+const VERSION = 'Versión 36 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -400,12 +400,12 @@ setMuted(muted);
 
 /* ---------- game data ---------- */
 // drop = shells dropped on average (1,8 means one, and a second one 80 % of the time); conch = value of the big shell.
-// Tuned with simulated games (14 nov 2026): a player who buys well and picks up shells beats wave 10 about 7 times in 10;
-// one who doesn't chase shells doesn't get past wave 6.
+// Tuned with simulated games (15 nov 2026): a player who buys well and picks up shells conquers level 1 (boss included)
+// about 7 times in 10; one who doesn't chase shells doesn't get past wave 6.
 const TYPES = {
-  normal: { hp: 4,  sp: 34, r: 11, drop: 1,   conch: 0, atk: 3, rate: .9,  sc: 1 },
-  crawl:  { hp: 3,  sp: 62, r: 9,  drop: .7,  conch: 0, atk: 2, rate: .6,  sc: .95 },
-  big:    { hp: 14, sp: 22, r: 16, drop: 1.8, conch: 3, atk: 9, rate: 1.1, sc: 1.45 },
+  normal: { hp: 4,  sp: 34, r: 11, drop: 1.12, conch: 0, atk: 3, rate: .9,  sc: 1 },
+  crawl:  { hp: 3,  sp: 62, r: 9,  drop: .8,  conch: 0, atk: 2, rate: .6,  sc: .95 },
+  big:    { hp: 14, sp: 22, r: 16, drop: 2,   conch: 3, atk: 9, rate: 1.1, sc: 1.45 },
   // the boss comes once, halfway through the last wave of the level
   boss:   { hp: 110, sp: 13, r: 27, drop: 0,  conch: 0, atk: 10, rate: 1.5, sc: 2.6 }
 };
