@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 44 · 15 nov 2026';
+const VERSION = 'Versión 45 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -28,7 +28,7 @@ const LEVEL_DEFS = {
   2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.5,
        shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] },
   // level 3: two castles set apart differently, sunshades, float babies and crabs that pinch the kid
-  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, count: .5, drop: 1.5, crabs: 5,
+  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, boss: 'bossCrawl', count: .5, drop: 1.5, crabs: 5,
        shades: [[180, 300, '#ffd23f'], [420, 330, '#e0457b'], [300, 230, '#3dc8e8']] }
 };
 // Crabs: step on one and it holds the kid for PINCH_TIME seconds (he still throws, but can't walk). 1,5 s is
@@ -290,7 +290,8 @@ function drawBaby(b) {
     ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-6, cy - 10); ctx.lineTo(-8.5, cy - 3); ctx.stroke();
     ctx.strokeStyle = '#ddd'; ctx.lineWidth = .9; ctx.beginPath(); ctx.arc(0, cy - 3, 11.5, .15, Math.PI - .15); ctx.stroke();
   }
-  if (b.type === 'boss') {      // a big dummy (dropped while crying) and a beach spade to wreck castles with
+  if (TYPES[b.type].boss) {     // a big dummy (dropped while crying); the walking boss also carries a beach spade
+    if (b.type === 'boss') {
     const swing = Math.sin(b.t * (b.atkT < .3 ? 14 : 4)) * .35;
     ctx.save(); ctx.translate(9.5, -11 - bob); ctx.rotate(.55 + swing * .6);
     ctx.strokeStyle = tint('#ffd23f', f); ctx.lineWidth = 1.8; ctx.lineCap = 'round';
@@ -299,6 +300,7 @@ function drawBaby(b) {
     ctx.fillStyle = tint('#2c6fe0', f); ctx.beginPath(); ctx.moveTo(-3, -11); ctx.lineTo(3, -11); ctx.quadraticCurveTo(4.6, -20, 0, -24); ctx.quadraticCurveTo(-4.6, -20, -3, -11); ctx.fill();   // blade
     ctx.restore();
     ctx.fillStyle = tint(b.skin, f); ell(8, -11 - bob, 2.4, 2.4); ctx.fill();          // hand on the handle
+    }
     if (!cry) {
       ctx.fillStyle = tint('#7bc8f0', f); ctx.strokeStyle = '#4a9cc8'; ctx.lineWidth = .5; ell(0, cy + 2.8, 4.6, 2.5); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#fff'; ell(-1.6, cy + 2.2, 1.1, .6); ctx.fill();
@@ -306,7 +308,7 @@ function drawBaby(b) {
     }
   }
   ctx.restore();
-  if (b.state === 'walk' && b.type !== 'boss' && (b.hp < b.max || (b.ring > 0 && b.ring < b.ringMax) || b.type === 'float')) {
+  if (b.state === 'walk' && !TYPES[b.type].boss && (b.hp < b.max || (b.ring > 0 && b.ring < b.ringMax) || b.type === 'float')) {
     const top = b.y + (cy - 11) * sc, onRing = b.ring > 0, fr = clamp(onRing ? b.ring / b.ringMax : b.hp / b.max, .02, 1);
     ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(ctx, b.x - 11, top - 4, 22, 4, 2); ctx.fill();
     ctx.fillStyle = onRing ? '#3dc8e8' : '#ff5d4a'; rr(ctx, b.x - 10.5, top - 3.5, 21 * fr, 3, 1.5); ctx.fill();
@@ -461,7 +463,9 @@ const TYPES = {
   // the boss comes once, halfway through the last wave of the level
   // float baby (from level 2): its swim ring takes as much as the baby before it pops, so it lasts twice as long
   float:  { hp: 4,  sp: 30, r: 12, drop: 2,   conch: 0, atk: 3, rate: .9,  sc: 1 },
-  boss:   { hp: 110, sp: 13, r: 27, drop: 0,  conch: 0, atk: 10, rate: 1.5, sc: 2.6 }
+  boss:   { hp: 110, sp: 13, r: 27, drop: 0,  conch: 0, atk: 10, rate: 1.5, sc: 2.6, boss: true },
+  // boss of level 3: a huge crawler, faster than the walking boss but with less life
+  bossCrawl: { hp: 80, sp: 24, r: 25, drop: 0, conch: 0, atk: 8, rate: 1.1, sc: 2.4, boss: true, crawl: true }
 };
 const LEVEL_WAVES = 10;                   // waves per level; the last one brings the boss
 const UPG = {
@@ -796,7 +800,7 @@ function spawnBaby(boss) {
     ['float', levelDef().float && n >= 2 ? Math.min(.3, (n - 1) * .05) : 0], ['helmet', levelDef().helmet && n >= 2 ? Math.min(.25, (n - 1) * .05) : 0]];
   const tot = odds.reduce((a, o) => a + o[1], 0), k = tot > .85 ? .85 / tot : 1;
   let type = 'normal', acc = 0;
-  if (boss) type = 'boss';
+  if (boss) type = levelDef().boss || 'boss';
   else for (const [ty, pr] of odds) { acc += pr * k; if (r < acc) { type = ty; break; } }
   const T = TYPES[type], hs = 1 + .12 * (n - 1);
   let x, y;
@@ -939,7 +943,7 @@ function update(dt) {
             if (b.ring <= 0 && b.type === 'helmet') { b.ring = 0; puff(b.x, b.y, 22, 14, b.bucketC); sfx('clonk'); floatText('¡Clonc!', b.x, b.y, 30); }
             else if (b.ring <= 0) { b.ring = 0; puff(b.x, b.y, 12, 14, '#ff5d4a'); sfx('pop'); floatText('¡Plof!', b.x, b.y, 30); }
           } else { b.hp -= bl.dmg; b.flash = .12; }
-          const l = Math.hypot(bl.vx, bl.vy), kb = b.type === 'boss' ? 0 : 3; b.x += bl.vx / l * kb; b.y += bl.vy / l * kb;
+          const l = Math.hypot(bl.vx, bl.vy), kb = TYPES[b.type].boss ? 0 : 3; b.x += bl.vx / l * kb; b.y += bl.vy / l * kb;
           puff(bl.x, bl.y, 20, 5, '#d4ad6a'); sfx('hit');
           if (b.hp <= 0) die(b);
           gone = true; break;
@@ -1130,7 +1134,7 @@ function render(now) {
   drawOffscreen();
 
   // DOM overlays
-  const boss = ents.babies.find(b => b.type === 'boss' && b.state === 'walk'), bb = $('bossBar');
+  const boss = ents.babies.find(b => TYPES[b.type].boss && b.state === 'walk'), bb = $('bossBar');
   if (bb.hidden !== !boss) bb.hidden = !boss;
   if (boss) $('bossFill').style.width = clamp(boss.hp / boss.max, 0, 1) * 100 + '%';
   $('shellChip').style.transform = S.bump > 0 ? 'scale(' + (1 + S.bump * .6) + ')' : '';
