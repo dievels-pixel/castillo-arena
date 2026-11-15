@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 36 · 15 nov 2026';
+const VERSION = 'Versión 37 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -17,7 +17,15 @@ document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 const VW = 360, VH = 640;                 // what the screen shows
 const W = 600, H = 640;                   // the whole beach (as tall as the screen: no beach behind the castle); the camera follows the kid sideways
 const CS = .75;                           // castle scale (1 = original size)
-const CX = 300, CY = 440, CR = Math.round(62 * CS);   // castle centre and its attack radius
+const CR = Math.round(62 * CS);           // a castle's attack radius
+// Each level: where its castles stand (x, y). Babies go for the nearest castle; if any falls, the level is lost.
+const LEVEL_DEFS = {
+  1: { castles: [[300, 440]] },
+  2: { castles: [[160, 450], [440, 450]] }
+};
+let currentLevel = 1;
+const levelDef = () => LEVEL_DEFS[currentLevel] || LEVEL_DEFS[1];
+const CX = 300, CY = 440;                 // middle of the beach, where the castle of level 1 stands
 const SEA_Y = 56;                         // shoreline
 
 /* ---------- canvas sizing ---------- */
@@ -90,8 +98,9 @@ function buildBg() {
     for (let k = 0; k < 10; k++) { const r2 = k % 2 ? 2.6 : 7, an = k / 10 * TAU - Math.PI / 2; t.lineTo(Math.cos(an) * r2, Math.sin(an) * r2 * .7); }
     t.closePath(); t.fill(); t.restore();
   });
-  // bucket and spade left by the castle
-  t.save(); t.translate(CX + 108 * CS, CY + 40 * CS);
+  // bucket and spade left by the first castle
+  const c0 = levelDef().castles[0];
+  t.save(); t.translate(c0[0] + 108 * CS, c0[1] + 40 * CS);
   t.fillStyle = 'rgba(90,60,20,.2)'; t.beginPath(); t.ellipse(2, 1, 11, 4, 0, 0, TAU); t.fill();
   t.fillStyle = '#ff5d4a'; t.beginPath(); t.moveTo(-8, -16); t.lineTo(8, -16); t.lineTo(6, 0); t.lineTo(-6, 0); t.closePath(); t.fill();
   t.fillStyle = '#d94436'; t.beginPath(); t.ellipse(0, -16, 8, 2.6, 0, 0, TAU); t.fill();
@@ -99,8 +108,9 @@ function buildBg() {
   t.strokeStyle = '#ffd23f'; t.lineWidth = 2; t.beginPath(); t.moveTo(14, -2); t.lineTo(22, -18); t.stroke();
   t.fillStyle = '#2c6fe0'; t.beginPath(); t.ellipse(12.5, 1, 3.5, 5, .45, 0, TAU); t.fill();
   t.restore();
-  // castle mound
-  t.fillStyle = '#d6ae66'; t.beginPath(); t.ellipse(CX, CY + 4 * CS, 92 * CS, 30 * CS, 0, 0, TAU); t.fill();
+  // castle mounds
+  t.fillStyle = '#d6ae66';
+  for (const [x, y] of levelDef().castles) { t.beginPath(); t.ellipse(x, y + 4 * CS, 92 * CS, 30 * CS, 0, 0, TAU); t.fill(); }
 }
 // The shoreline undulates along the beach and moves with time (two waves of different length).
 const shoreY = (x, t) => SEA_Y + Math.sin(x * .012 + t * .8) * 7 + Math.sin(x * .031 - t * 1.3) * 3.5;
@@ -135,9 +145,9 @@ function tower(x, base, h, r) {
   for (let k = 0; k < 3; k++) { const xx = x - r * .7 + k * r * .7; ctx.fillStyle = SAND; ctx.fillRect(xx - 3, base - h + r * .3 - 5, 6, 6); }
   ctx.fillStyle = WOOD; rr(ctx, x - 2.5, base - h * .62, 5, 9, 2.5); ctx.fill();
 }
-function drawCastle(now) {
-  const hf = clamp(S.hp / 100, 0, 1), k = .72 + .28 * hf, sx = S.shake > 0 ? Math.sin(now * 90) * S.shake * 10 : 0;
-  ctx.save(); ctx.translate(CX + sx, CY); ctx.scale(CS, CS * k);
+function drawCastle(c, now) {
+  const hf = clamp(c.hp / 100, 0, 1), k = .72 + .28 * hf, sx = c.shake > 0 ? Math.sin(now * 90) * c.shake * 10 : 0;
+  ctx.save(); ctx.translate(c.x + sx, c.y); ctx.scale(CS, CS * k);
   // keep (back)
   ctx.fillStyle = SAND_D; ctx.fillRect(-20, -66, 40, 54);
   ctx.fillStyle = SAND; ctx.fillRect(-20, -66, 37, 54);
@@ -440,8 +450,10 @@ function itemState(id) {
     const l = S.friendLvl, maxed = l >= 6, has = S.friends.length + S.pending > 0, fmt = k => f1(.7 + .12 * k) + ' b/s · daño ' + f1(1.5 + .5 * k);
     return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de 6, para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: has };
   }
-  const hurt = S.hp < 100;
-  return { name: 'Reparar castillo', now: Math.ceil(S.hp) + '/100', next: hurt ? Math.min(100, Math.ceil(S.hp) + 35) + '/100' : '', note: hurt ? 'Recupera 35' : 'Está entero', cost: repairCost(), maxed: false, enabled: hurt };
+  const hurt = S.hp < 100, many = S.castles.length > 1, fmt = c => Math.ceil(c.hp);
+  return { name: many ? 'Reparar castillos' : 'Reparar castillo', now: S.castles.map(fmt).join(' y ') + (many ? '' : '/100'),
+    next: hurt ? S.castles.map(c => Math.min(100, fmt(c) + 35)).join(' y ') + (many ? '' : '/100') : '',
+    note: hurt ? (many ? 'Cada castillo recupera 35' : 'Recupera 35') : (many ? 'Están enteros' : 'Está entero'), cost: repairCost(), maxed: false, enabled: hurt };
 }
 const affordable = id => { const st = itemState(id); return !st.maxed && st.enabled && S.shells >= st.cost; };
 function buy(id) {
@@ -450,7 +462,7 @@ function buy(id) {
   if (UPG[id]) S.up[id]++;
   else if (id === 'friend') S.pending++;
   else if (id === 'train') S.friendLvl++;
-  else { S.hp = Math.min(100, S.hp + 35); S.repaired = true; }
+  else { for (const c of S.castles) c.hp = Math.min(100, c.hp + 35); syncHp(); S.repaired = true; }
   updateHud(); sfx('buy'); puff(S.player.x, S.player.y, 30, 14, '#fff3b0'); drawShop();
 }
 const SHELL_SVG = '<svg class="ic"><use href="#shell"/></svg>';
@@ -475,8 +487,10 @@ function newGame() {
     t: 0, hp: 100, shells: 0, wave: 1, kills: 0, spawnLeft: 0, spawnT: 0, gap: null, banner: 0, bannerTxt: '',
     over: false, shake: 0, bump: 0, hint: 9, level: currentLevel, hit: false, repaired: false, bossAt: -1,
     up: { rate: 0, power: 0, range: 0, magnet: 0 }, friends: [], friendLvl: 0, pending: 0,
-    player: { x: CX, y: 540, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
+    castles: levelDef().castles.map(([x, y]) => ({ x, y, hp: 100, shake: 0 })),
+    player: { x: levelDef().castles.reduce((a, c) => a + c[0], 0) / levelDef().castles.length, y: 540, aim: -Math.PI / 2, fireT: 0, walk: 0, moving: false, kick: 0 }
   };
+  buildBg();
   startWave(1); updateHud(); followCam();
 }
 function startWave(n) {
@@ -485,9 +499,14 @@ function startWave(n) {
   S.bannerTxt = n === LEVEL_WAVES ? '¡Última oleada!' : 'Oleada ' + n;
   $('waveNo').textContent = n + '/' + LEVEL_WAVES;
 }
+const syncHp = () => { S.hp = Math.min(...S.castles.map(c => c.hp)); };   // the weakest castle is what counts
 function updateHud() {
-  const f = clamp(S.hp / 100, 0, 1), fill = $('hpFill');
-  fill.style.width = (f * 100) + '%'; fill.classList.toggle('low', f < .3);
+  const box = $('hpBars');
+  if (box.children.length !== S.castles.length) {
+    box.innerHTML = S.castles.map(() => '<div class="bar"><i></i></div>').join('');
+    $('hpLabel').textContent = S.castles.length > 1 ? 'Castillos' : 'Castillo';
+  }
+  S.castles.forEach((c, i) => { const f = clamp(c.hp / 100, 0, 1), fill = box.children[i].firstChild; fill.style.width = (f * 100) + '%'; fill.classList.toggle('low', f < .3); });
   $('shellNo').textContent = S.shells;
 }
 // One look per friend, in recruiting order: swimsuit, headwear and skin.
@@ -507,8 +526,8 @@ const COLLECT_TIME = 3;                   // seconds to pick up shells after the
 const FRIEND_GAP = 50;                     // minimum distance between two friends' holes (2,5 m)
 function spotProblem(x, y) {
   if (y < SEA_Y + 60) return 'Demasiado cerca del mar';
-  if (((x - CX) / (115 * CS)) ** 2 + ((y - CY) / (55 * CS)) ** 2 < 1) return 'Encima del castillo no';
-  if (y > CY - 50) return 'Tiene que estar delante del castillo, hacia el mar';
+  if (S.castles.some(c => ((x - c.x) / (115 * CS)) ** 2 + ((y - c.y) / (55 * CS)) ** 2 < 1)) return 'Encima del castillo no';
+  if (y > Math.min(...S.castles.map(c => c.y)) - 50) return 'Tiene que estar delante del castillo, hacia el mar';
   if (S.friends.some(f => Math.hypot(f.x - x, f.y - y) < FRIEND_GAP)) return 'Muy cerca de otro amigo';
   return '';
 }
@@ -559,9 +578,9 @@ function showStart() {
 }
 
 /* ---------- start screen: the road of castles, one per level ---------- */
-const LEVELS = 5, LEVELS_READY = 1;   // levels shown on the map / levels that already have content
+const LEVELS = 5, LEVELS_READY = 2;   // levels shown on the map / levels that already have content
 const MAP_NODES = [[105, 418, 30], [250, 336, 33], [112, 250, 36], [252, 160, 40], [150, 70, 44]];  // x, y, radius in a 360x480 map
-let currentLevel = 1, msgT = 0;
+let msgT = 0;
 const unlocked = n => n === 1 || (progress[n - 1] || 0) > 0;
 // Castle drawn as SVG, bigger and grander with each level. Base centred at (0,0), units roughly in pixels.
 function castleSvg(level) {
@@ -730,7 +749,7 @@ function spawnBaby(boss) {
   const type = boss ? 'boss' : r < pBig ? 'big' : (r < pBig + pCr ? 'crawl' : 'normal');
   const T = TYPES[type], hs = 1 + .12 * (n - 1);
   let x, y;
-  if (boss) { x = CX + rnd(-120, 120); y = 60; }
+  if (boss) { x = W / 2 + rnd(-120, 120); y = 60; }
   else if (Math.random() < .7) { x = 24 + Math.random() * (W - 48); y = 66; }
   else { x = Math.random() < .5 ? -12 : W + 12; y = 90 + Math.random() * 200; }
   const skin = SKINS[Math.floor(Math.random() * SKINS.length)];
@@ -748,17 +767,22 @@ function addDrop(x, y, kind, v) {
 }
 function die(b) {
   S.kills++; b.state = 'cry'; b.cryT = 0;
-  const dx = b.x - CX, dy = b.y - CY, d = Math.hypot(dx, dy) || 1; b.fx = dx / d; b.fy = dy / d;
+  const c = nearestCastle(b.x, b.y), dx = b.x - c.x, dy = b.y - c.y, d = Math.hypot(dx, dy) || 1; b.fx = dx / d; b.fy = dy / d;
   const T = TYPES[b.type], n = Math.floor(T.drop + Math.random());
   for (let i = 0; i < n; i++) addDrop(b.x, b.y, 'shell', 1);
   if (T.conch) addDrop(b.x, b.y, 'conch', T.conch);
   sfx('cry');
   if (Math.random() < .6) floatText(['¡Buaaa!', '¡Uaaa!', '¡Buaaaa!'][Math.floor(Math.random() * 3)], b.x, b.y, 44);
 }
-function hitCastle(d) {
-  S.hp = Math.max(0, S.hp - d); S.shake = .25; S.hit = true; sfx('castle');
-  puff(CX + rnd(-40, 40) * CS, CY + 8 * CS, 30, 3, '#d9b873'); updateHud();
-  if (S.hp <= 0) gameOver();
+function nearestCastle(x, y) {
+  let best = S.castles[0], bd = 1e9;
+  for (const c of S.castles) { const d = Math.hypot(c.x - x, c.y - y); if (d < bd) { bd = d; best = c; } }
+  return best;
+}
+function hitCastle(c, d) {
+  c.hp = Math.max(0, c.hp - d); c.shake = .25; S.hit = true; syncHp(); sfx('castle');
+  puff(c.x + rnd(-40, 40) * CS, c.y + 8 * CS, 30, 3, '#d9b873'); updateHud();
+  if (c.hp <= 0) gameOver();
 }
 function nearest(x, y, range) {
   let t = null, bd = 1e9;
@@ -777,7 +801,7 @@ function update(dt) {
   if ((mode !== 'play' && mode !== 'place') || S.over) return;
   S.t += dt;
   const p = S.player;
-  S.shake = Math.max(0, S.shake - dt); S.bump = Math.max(0, S.bump - dt);
+  for (const c of S.castles) c.shake = Math.max(0, c.shake - dt); S.bump = Math.max(0, S.bump - dt);
   S.banner = Math.max(0, S.banner - dt); S.hint = Math.max(0, S.hint - dt); p.kick = Math.max(0, p.kick - dt);
 
   // movement
@@ -792,9 +816,10 @@ function update(dt) {
   p.x += ix * 118 * dt; p.y += iy * 118 * dt;
   if (p.moving) p.walk += dt * mag;
   p.x = clamp(p.x, 14, W - 14); p.y = clamp(p.y, 76, H - 16);
-  const pdx = p.x - CX, pdy = p.y - CY, pd = Math.hypot(pdx, pdy);
-  const pr = 66 * CS;
-  if (pd < pr && pd > .01) { p.x = CX + pdx / pd * pr; p.y = CY + pdy / pd * pr; }
+  for (const c of S.castles) {
+    const pdx = p.x - c.x, pdy = p.y - c.y, pd = Math.hypot(pdx, pdy), pr = 66 * CS;
+    if (pd < pr && pd > .01) { p.x = c.x + pdx / pd * pr; p.y = c.y + pdy / pd * pr; }
+  }
   followCam(dt);
 
   // kid auto fire
@@ -842,9 +867,9 @@ function update(dt) {
   for (const b of ents.babies) {
     b.t += dt; b.flash = Math.max(0, b.flash - dt);
     if (b.state === 'walk') {
-      const dx = CX - b.x, dy = CY - b.y, d = Math.hypot(dx, dy) || 1;
+      const c = nearestCastle(b.x, b.y), dx = c.x - b.x, dy = c.y - b.y, d = Math.hypot(dx, dy) || 1;
       if (d > CR + b.r * .3) { const m = b.sp * dt; b.x += dx / d * m; b.y += dy / d * m; }
-      else { b.atkT -= dt; if (b.atkT <= 0) { b.atkT = b.rate; hitCastle(b.atk); if (S.over) return; } }
+      else { b.atkT -= dt; if (b.atkT <= 0) { b.atkT = b.rate; hitCastle(c, b.atk); if (S.over) return; } }
     } else {
       b.cryT += dt; b.x += b.fx * 110 * dt; b.y += b.fy * 110 * dt;
     }
@@ -951,13 +976,13 @@ function render(now) {
 
   // standing things, back to front
   order.length = 0;
-  order.push({ y: CY + 16, k: 0 });
+  for (const c of S.castles) order.push({ y: c.y + 16, k: 0, o: c });
   for (const f of S.friends) order.push({ y: f.y, k: 2, o: f });
   for (const b of ents.babies) order.push({ y: b.y, k: 3, o: b });
   order.push({ y: p.y, k: 4 });
   order.sort((a, b) => a.y - b.y);
   for (const e of order) {
-    if (e.k === 0) drawCastle(now);
+    if (e.k === 0) drawCastle(e.o, now);
     else if (e.k === 2) drawFriend(e.o, now);
     else if (e.k === 3) drawBaby(e.o);
     else drawKid(p.x, p.y, Object.assign(KID_LOOK, { aim: p.aim, moving: p.moving, walk: p.walk, kick: p.kick }));
