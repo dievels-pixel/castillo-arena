@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 47 · 15 nov 2026';
+const VERSION = 'Versión 48 · 16 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -25,11 +25,11 @@ const LEVEL_DEFS = {
   1: { castles: [[300, 440]], count: 1, drop: 1 },
   // level 2, tuned with simulated games: half the babies of level 1 but 50 % more shells each; a player who buys
   // well wins it about 1 time in 4 (level 1: about 6 in 10)
-  2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.5,
+  2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.53,
        shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] },
   // level 3: two castles set apart differently, sunshades, float and bucket babies, crabs that pinch the kid and a
   // crawling boss. Tuned with simulated games: a player who buys well wins it about 1 time in 4 or 5
-  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, boss: 'bossCrawl', count: .5, drop: 1.55, crabs: 5,
+  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, boss: 'bossCrawl', count: .5, drop: 1.58, crabs: 5,
        shades: [[180, 300, '#ffd23f'], [420, 330, '#e0457b'], [300, 230, '#3dc8e8']] }
 };
 // Crabs: step on one and it holds the kid for PINCH_TIME seconds (he still throws, but can't walk). 1,5 s is
@@ -190,7 +190,6 @@ function drawCastle(c, now) {
   ctx.restore();
 }
 
-const FRIEND_COST = [20, 30, 45, 65, 90, 120];
 
 /* ---------- characters ---------- */
 // The kid (and friends): older child, three-quarter view, faces left or right.
@@ -469,32 +468,26 @@ const TYPES = {
   bossCrawl: { hp: 40, sp: 20, r: 25, drop: 0, conch: 0, atk: 6, rate: 1.1, sc: 2.4, boss: true, crawl: true }
 };
 const LEVEL_WAVES = 10;                   // waves per level; the last one brings the boss
-// Economy granularity: babies drop ECON times the shells, and every upgrade comes in ECON smaller steps whose prices
-// add up to the same as one old step (in today's shells). Same difficulty, ECON times more purchases.
-const ECON = 3;
-// Small steps let leftover shells work sooner, so shells are multiplied a little less than ECON to keep the
-// difficulty where it was (checked with simulated games on the three levels).
-const DROP_K = 2.8;
-// Upgrades as designed per "big step" (k = big steps; val(k) = value); each big step is split into ECON levels.
+// Economy (tuned with simulated games, 16 nov 2026). Each wave babies get hpGrow times tougher and drop shellGrow
+// times more shells; upgrades have few, big levels. By the end of a level a good player has everything around half
+// way, or a couple of upgrades maxed (a kid throwing lots of balls with lots of damage), but never everything.
+const ECO = { hpGrow: 1.32, shellGrow: 1.2, shells: 1.15 };
 const UPG = {
-  rate:  { name: 'Cadencia', base: 8,  g: 1.4,  steps: 10, val: k => 1.6 + .45 * k,  fmt: v => f1(v) + ' bolas/s' },
-  power: { name: 'Daño',     base: 10, g: 1.4,  steps: 10, val: k => 2 + .6 * k,     fmt: v => 'daño ' + f1(v) },
-  range: { name: 'Alcance',  base: 6,  g: 1.35, steps: 8,  val: k => (175 + 14 * k) / 20, fmt: v => f1(v) + ' m' },
-  magnet: { name: 'Imán de conchas', base: 6, g: 1.35, steps: 8, val: k => (78 + 16 * k) / 20, fmt: v => 'atrae a ' + f1(v) + ' m' }
+  rate:  { name: 'Cadencia', base: 8,  g: 1.17, max: 12, val: l => 1.6 + .55 * l, fmt: v => f1(v) + ' bolas/s' },
+  power: { name: 'Daño',     base: 10, g: 1.17, max: 12, val: l => 2 + .8 * l,    fmt: v => 'daño ' + f1(v) },
+  range: { name: 'Alcance',  base: 6,  g: 1.3,  max: 8,  val: l => (175 + 14 * l) / 20, fmt: v => f1(v) + ' m' },
+  magnet: { name: 'Imán de conchas', base: 6, g: 1.3, max: 8, val: l => (78 + 16 * l) / 20, fmt: v => 'atrae a ' + f1(v) + ' m' }
 };
-for (const id in UPG) UPG[id].max = UPG[id].steps * ECON;
-const upVal = (id, l) => UPG[id].val(l / ECON);
-// price of level l when a big step (base * g^k) is split into ECON levels growing by c = g^(1/ECON)
-function stepCost(base, g, l) {
-  const c = Math.pow(g, 1 / ECON); let sum = 0; for (let i = 0; i < ECON; i++) sum += Math.pow(c, i);
-  return Math.max(1, Math.round(base * ECON / sum * Math.pow(c, l)));
-}
-const upCost = (u, l) => stepCost(u.base, u.g, l);
-const REPAIR = Math.round(35 / ECON);                    // castle life back per repair
-const repairCost = () => 5 + 2 * S.wave;
-const TRAIN_MAX = 6 * ECON;
-const fRateAt = l => .7 + .12 * l / ECON, fDmgAt = l => 1.5 + .5 * l / ECON;
-const fRate = () => fRateAt(S.friendLvl), fDmg = () => fDmgAt(S.friendLvl), F_RANGE = 150;
+const upVal = (id, l) => UPG[id].val(l);
+const upCost = (u, l) => Math.round(u.base * Math.pow(u.g, l));
+const shellScale = () => Math.pow(ECO.shellGrow, S.wave - 1);       // prices that must follow the growing shells
+const REPAIR = 35;                                     // castle life back per repair
+const repairCost = () => Math.round((5 + 2 * S.wave) * shellScale());
+// Friends throw with a share of the kid's own damage, so they keep up as the babies get tougher; training raises
+// how often they throw and that share.
+const FRIEND = { cost: [15, 25, 40, 60, 85, 115], trainMax: 8, trainBase: 20, trainG: 1.3 };
+const fRateAt = l => 1 + .1 * l, fShareAt = l => .6 + .05 * l;
+const fRate = () => fRateAt(S.friendLvl), fDmg = () => upVal('power', S.up.power) * fShareAt(S.friendLvl), F_RANGE = 150;
 
 const cam = { x: CX - VW / 2, y: 0 };
 let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause | shop
@@ -510,11 +503,11 @@ function itemState(id) {
   }
   if (id === 'friend') {
     const n = S.friends.length + S.pending, maxed = n >= 6;
-    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Tú eliges dónde cava su agujero', cost: maxed ? 0 : FRIEND_COST[n] * ECON, maxed, enabled: true };
+    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Tú eliges dónde cava su agujero', cost: maxed ? 0 : FRIEND.cost[n], maxed, enabled: true };
   }
   if (id === 'train') {
-    const l = S.friendLvl, maxed = l >= TRAIN_MAX, has = S.friends.length + S.pending > 0, fmt = k => f1(fRateAt(k)) + ' b/s · daño ' + f1(fDmgAt(k));
-    return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de ' + TRAIN_MAX + ', para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : stepCost(25, 1.5, l), maxed, enabled: has };
+    const l = S.friendLvl, maxed = l >= FRIEND.trainMax, has = S.friends.length + S.pending > 0, fmt = k => f1(fRateAt(k)) + ' b/s · ' + Math.round(fShareAt(k) * 100) + ' % de tu daño';
+    return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de ' + FRIEND.trainMax + ', para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : Math.round(FRIEND.trainBase * Math.pow(FRIEND.trainG, l)), maxed, enabled: has };
   }
   const hurt = S.hp < 100, many = S.castles.length > 1, fmt = c => Math.ceil(c.hp);
   return { name: many ? 'Reparar castillos' : 'Reparar castillo', now: S.castles.map(fmt).join(' y ') + (many ? '' : '/100'),
@@ -820,7 +813,7 @@ function spawnBaby(boss) {
   let type = 'normal', acc = 0;
   if (boss) type = levelDef().boss || 'boss';
   else for (const [ty, pr] of odds) { acc += pr * k; if (r < acc) { type = ty; break; } }
-  const T = TYPES[type], hs = 1 + .12 * (n - 1);
+  const T = TYPES[type], hs = Math.pow(ECO.hpGrow, n - 1);
   let x, y;
   if (boss) { x = W / 2 + rnd(-120, 120); y = 60; }
   else if (Math.random() < .7) { x = 24 + Math.random() * (W - 48); y = 66; }
@@ -841,9 +834,9 @@ function addDrop(x, y, kind, v) {
 function die(b) {
   S.kills++; b.state = 'cry'; b.cryT = 0;
   const c = nearestCastle(b.x, b.y), dx = b.x - c.x, dy = b.y - c.y, d = Math.hypot(dx, dy) || 1; b.fx = dx / d; b.fy = dy / d;
-  const T = TYPES[b.type], n = Math.floor(T.drop * levelDef().drop * DROP_K + Math.random());
+  const k = ECO.shells * levelDef().drop * shellScale(), T = TYPES[b.type], n = Math.floor(T.drop * k + Math.random());
   for (let i = 0; i < n; i++) addDrop(b.x, b.y, 'shell', 1);
-  if (T.conch) addDrop(b.x, b.y, 'conch', Math.round(T.conch * DROP_K));
+  if (T.conch) addDrop(b.x, b.y, 'conch', Math.round(T.conch * k));
   sfx('cry');
   if (Math.random() < .6) floatText(['¡Buaaa!', '¡Uaaa!', '¡Buaaaa!'][Math.floor(Math.random() * 3)], b.x, b.y, 44);
 }

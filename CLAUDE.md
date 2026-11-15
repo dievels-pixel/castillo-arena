@@ -20,7 +20,7 @@ La pantalla inicial es el recorrido de niveles: castillos cada vez más grandes 
 - `js/game.js`: todo el juego, en 2D con Canvas y dibujado con código (sin librerías ni compilación).
   - Todo trabaja en "píxeles de playa" (20 px = 1 m). La playa mide 600x640 y la pantalla enseña 360x640: la cámara (`cam`) sigue al niño solo de lado a lado. Detrás del castillo no hay playa de sobra porque por ahí no vienen bebés. Vista cenital inclinada fija: la altura se dibuja hacia arriba (y - h) y se pinta de atrás adelante ordenando por y.
   - Datos ajustables: `TYPES` (bebés), `UPG` (mejoras), `FRIEND_COST`, `SHOP` (orden del menú de mejoras).
-  - Economía fina: `ECON` = 3 parte cada mejora en 3 pasos pequeños (precios con `stepCost`, que suman lo mismo que un paso grande) y los bebés sueltan `DROP_K` = 2,8 veces las conchas de `TYPES`. Reparar cura `REPAIR` = 12 por compra. Así se compra unas tres veces más a menudo con la misma dificultad (comprobado con partidas simuladas en los tres niveles).
+  - Economía (`ECO`, `UPG`, `FRIEND`): en cada oleada los bebés tienen `hpGrow` = 1,32 veces más vida y sueltan `shellGrow` = 1,2 veces más conchas. Cadencia y Daño tienen 12 niveles (máximo: 8,2 bolas/s y daño 11,6), Alcance, Imán y Entrenar 8. Los amigos tiran con un porcentaje del daño del niño (60 % y +5 % por nivel de entrenamiento), así crecen con él. Reparar cura 35 y cuesta más en oleadas altas. Objetivo de diseño, comprobado con partidas simuladas: al final de un nivel se tiene todo hacia la mitad o alguna mejora al máximo, nunca todo; victorias del bot ~50 % (nivel 1) y ~35 % (niveles 2 y 3).
   - `update(dt)` simula, `render(now)` dibuja. El fondo estático se pinta una vez en `buildBg()`.
 
 ## Cómo probar
