@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 43 · 15 nov 2026';
+const VERSION = 'Versión 44 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -28,7 +28,7 @@ const LEVEL_DEFS = {
   2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.5,
        shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] },
   // level 3: two castles set apart differently, sunshades, float babies and crabs that pinch the kid
-  3: { castles: [[180, 440], [420, 470]], float: true, count: .5, drop: 1.5, crabs: 5,
+  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, count: .5, drop: 1.5, crabs: 5,
        shades: [[180, 300, '#ffd23f'], [420, 330, '#e0457b'], [300, 230, '#3dc8e8']] }
 };
 // Crabs: step on one and it holds the kid for PINCH_TIME seconds (he still throws, but can't walk). 1,5 s is
@@ -230,7 +230,7 @@ const SKINS = ['#ffdcc2', '#f6c7a1', '#e0a878', '#b9784c', '#8a5634'];
 const HAIRS = ['#3b2814', '#6b3e1f', '#c8642b', '#e9c46a', '#1f1a17'];
 // Babies: kawaii, no hat, head a bit flat underneath, mouth set between the eyes.
 function drawBaby(b) {
-  const crawl = b.type === 'crawl', cry = b.state === 'cry', sc = TYPES[b.type].sc;
+  const crawl = !!TYPES[b.type].crawl, cry = b.state === 'cry', sc = TYPES[b.type].sc;
   const rate = cry ? 22 : (crawl ? 16 : 9), sw = Math.sin(b.t * rate), bob = Math.abs(sw) * 1.5;
   const f = b.flash > 0 ? b.flash / .12 : 0, sk = tint(b.skin, f), skD = tint(b.skinD, f), dia = tint('#ffffff', f);
   ctx.save(); ctx.translate(b.x, b.y); ctx.scale(sc, sc); ctx.rotate(sw * (cry ? .08 : .05));
@@ -283,6 +283,13 @@ function drawBaby(b) {
     ctx.beginPath(); ctx.arc(-.8, cy + 1.4, .8, .2, Math.PI - .2); ctx.arc(.8, cy + 1.4, .8, .2, Math.PI - .2); ctx.stroke();
   }
   ctx.fillStyle = 'rgba(255,130,150,.55)'; ell(-7.2, cy + 3.4, 1.9, 1.1); ctx.fill(); ell(7.2, cy + 3.4, 1.9, 1.1); ctx.fill();
+  if (b.type === 'helmet' && b.ring > 0) {   // upside-down beach bucket worn as a helmet
+    const bc = tint(b.bucketC, f), bd = tint(darken(b.bucketC), f);
+    ctx.fillStyle = bc; ctx.beginPath(); ctx.moveTo(-11, cy - 1); ctx.lineTo(-7, cy - 13); ctx.lineTo(7, cy - 13); ctx.lineTo(11, cy - 1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = bd; rr(ctx, -12, cy - 2.5, 24, 3, 1.5); ctx.fill(); ell(0, cy - 13, 7, 1.6); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-6, cy - 10); ctx.lineTo(-8.5, cy - 3); ctx.stroke();
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = .9; ctx.beginPath(); ctx.arc(0, cy - 3, 11.5, .15, Math.PI - .15); ctx.stroke();
+  }
   if (b.type === 'boss') {      // a big dummy (dropped while crying) and a beach spade to wreck castles with
     const swing = Math.sin(b.t * (b.atkT < .3 ? 14 : 4)) * .35;
     ctx.save(); ctx.translate(9.5, -11 - bob); ctx.rotate(.55 + swing * .6);
@@ -429,6 +436,7 @@ function sfx(name) {
     case 'castle': tone('sine', 95, 50, .2, .35); noise(.12, .1, 300, 'lowpass'); break;
     case 'pop': noise(.12, .3, 1800); tone('square', 900, 200, .12, .08); break;
     case 'thud': noise(.07, .1, 700); break;
+    case 'clonk': tone('triangle', 520, 380, .14, .2); tone('triangle', 780, 600, .1, .1, .03); break;
     case 'pinch': tone('square', 1200, 600, .06, .06); tone('square', 1300, 650, .06, .06, .09); break;
     case 'over': [392, 330, 262].forEach((f, i) => tone('triangle', f, f * .97, .32, .18, i * .3)); break;
   }
@@ -446,7 +454,9 @@ setMuted(muted);
 // about 7 times in 10; one who doesn't chase shells doesn't get past wave 6.
 const TYPES = {
   normal: { hp: 4,  sp: 34, r: 11, drop: 1.12, conch: 0, atk: 3, rate: .9,  sc: 1 },
-  crawl:  { hp: 3,  sp: 62, r: 9,  drop: .8,  conch: 0, atk: 2, rate: .6,  sc: .95 },
+  crawl:  { hp: 3,  sp: 62, r: 9,  drop: .8,  conch: 0, atk: 2, rate: .6,  sc: .95, crawl: true },
+  // crawler with a beach bucket for a helmet (from level 3): knock the bucket off first, then the baby
+  helmet: { hp: 3,  sp: 60, r: 9,  drop: 1.6, conch: 0, atk: 2, rate: .6,  sc: .95, crawl: true },
   big:    { hp: 14, sp: 22, r: 16, drop: 2,   conch: 3, atk: 9, rate: 1.1, sc: 1.45 },
   // the boss comes once, halfway through the last wave of the level
   // float baby (from level 2): its swim ring takes as much as the baby before it pops, so it lasts twice as long
@@ -781,16 +791,20 @@ function gameOver() {
 /* ---------- simulation ---------- */
 function spawnBaby(boss) {
   const n = S.wave, r = Math.random();
-  const pBig = n >= 3 ? Math.min(.3, (n - 2) * .06) : 0, pCr = n >= 2 ? Math.min(.35, (n - 1) * .08) : 0;
-  const pFl = levelDef().float && n >= 2 ? Math.min(.3, (n - 1) * .05) : 0;
-  const type = boss ? 'boss' : r < pBig ? 'big' : r < pBig + pCr ? 'crawl' : r < pBig + pCr + pFl ? 'float' : 'normal';
+  // chance of each special baby this wave; if together they pass 85 %, they are scaled down so normals remain
+  const odds = [['big', n >= 3 ? Math.min(.3, (n - 2) * .06) : 0], ['crawl', n >= 2 ? Math.min(.35, (n - 1) * .08) : 0],
+    ['float', levelDef().float && n >= 2 ? Math.min(.3, (n - 1) * .05) : 0], ['helmet', levelDef().helmet && n >= 2 ? Math.min(.25, (n - 1) * .05) : 0]];
+  const tot = odds.reduce((a, o) => a + o[1], 0), k = tot > .85 ? .85 / tot : 1;
+  let type = 'normal', acc = 0;
+  if (boss) type = 'boss';
+  else for (const [ty, pr] of odds) { acc += pr * k; if (r < acc) { type = ty; break; } }
   const T = TYPES[type], hs = 1 + .12 * (n - 1);
   let x, y;
   if (boss) { x = W / 2 + rnd(-120, 120); y = 60; }
   else if (Math.random() < .7) { x = 24 + Math.random() * (W - 48); y = 66; }
   else { x = Math.random() < .5 ? -12 : W + 12; y = 90 + Math.random() * 200; }
   const skin = SKINS[Math.floor(Math.random() * SKINS.length)];
-  ents.babies.push({ type, x, y, hp: T.hp * hs, max: T.hp * hs, ring: type === 'float' ? T.hp * hs : 0, ringMax: T.hp * hs, sp: T.sp * (.9 + Math.random() * .2), r: T.r,
+  ents.babies.push({ type, x, y, hp: T.hp * hs, max: T.hp * hs, ring: type === 'float' || type === 'helmet' ? T.hp * hs : 0, ringMax: T.hp * hs, bucketC: ['#ff5d4a', '#2c6fe0', '#ffd23f', '#2fb86a'][Math.floor(Math.random() * 4)], sp: T.sp * (.9 + Math.random() * .2), r: T.r,
     skin, skinD: darken(skin), hair: boss ? 0 : Math.floor(Math.random() * 4), hairC: HAIRS[Math.floor(Math.random() * HAIRS.length)],
     state: 'walk', flash: 0, t: Math.random() * 6, atkT: Math.random() * .5, rate: T.rate, atk: T.atk, cryT: 0, fx: 0, fy: 0 });
 }
@@ -922,7 +936,8 @@ function update(dt) {
         if (Math.hypot(b.x - bl.x, b.y - bl.y) < b.r + 4) {
           if (b.ring > 0) {                       // the swim ring soaks up the hits until it pops
             b.ring -= bl.dmg; b.flash = .12;
-            if (b.ring <= 0) { b.ring = 0; puff(b.x, b.y, 12, 14, '#ff5d4a'); sfx('pop'); floatText('¡Plof!', b.x, b.y, 30); }
+            if (b.ring <= 0 && b.type === 'helmet') { b.ring = 0; puff(b.x, b.y, 22, 14, b.bucketC); sfx('clonk'); floatText('¡Clonc!', b.x, b.y, 30); }
+            else if (b.ring <= 0) { b.ring = 0; puff(b.x, b.y, 12, 14, '#ff5d4a'); sfx('pop'); floatText('¡Plof!', b.x, b.y, 30); }
           } else { b.hp -= bl.dmg; b.flash = .12; }
           const l = Math.hypot(bl.vx, bl.vy), kb = b.type === 'boss' ? 0 : 3; b.x += bl.vx / l * kb; b.y += bl.vy / l * kb;
           puff(bl.x, bl.y, 20, 5, '#d4ad6a'); sfx('hit');
