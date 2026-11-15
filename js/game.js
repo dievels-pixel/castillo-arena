@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 39 · 15 nov 2026';
+const VERSION = 'Versión 40 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -18,10 +18,12 @@ const VW = 360, VH = 640;                 // what the screen shows
 const W = 600, H = 640;                   // the whole beach (as tall as the screen: no beach behind the castle); the camera follows the kid sideways
 const CS = .75;                           // castle scale (1 = original size)
 const CR = Math.round(62 * CS);           // a castle's attack radius
-// Each level: where its castles stand (x, y). Babies go for the nearest castle; if any falls, the level is lost.
+// Each level: where its castles stand (x, y), sunshades, whether float babies come, and two balance knobs:
+// count = babies per wave relative to level 1, drop = shells relative to level 1.
+// Babies go for the nearest castle; if any falls, the level is lost.
 const LEVEL_DEFS = {
-  1: { castles: [[300, 440]] },
-  2: { castles: [[160, 450], [440, 450]], float: true,
+  1: { castles: [[300, 440]], count: 1, drop: 1 },
+  2: { castles: [[160, 450], [440, 450]], float: true, count: 1, drop: 1,
        shades: [[160, 300, '#ff5d4a'], [440, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [300, 365, '#8e5bd9']] }
 };
 let currentLevel = 1;
@@ -507,7 +509,7 @@ function newGame() {
   startWave(1); updateHud(); followCam();
 }
 function startWave(n) {
-  S.wave = n; S.spawnLeft = 5 + 2 * n; S.spawnT = .8; S.gap = null; S.banner = 1.9; sfx('wave');
+  S.wave = n; S.spawnLeft = Math.round((5 + 2 * n) * levelDef().count); S.spawnT = .8; S.gap = null; S.banner = 1.9; sfx('wave');
   S.bossAt = n === LEVEL_WAVES ? Math.floor(S.spawnLeft / 2) : -1;     // the boss joins halfway through the last wave
   S.bannerTxt = n === LEVEL_WAVES ? '¡Última oleada!' : 'Oleada ' + n;
   $('waveNo').textContent = n + '/' + LEVEL_WAVES;
@@ -782,7 +784,7 @@ function addDrop(x, y, kind, v) {
 function die(b) {
   S.kills++; b.state = 'cry'; b.cryT = 0;
   const c = nearestCastle(b.x, b.y), dx = b.x - c.x, dy = b.y - c.y, d = Math.hypot(dx, dy) || 1; b.fx = dx / d; b.fy = dy / d;
-  const T = TYPES[b.type], n = Math.floor(T.drop + Math.random());
+  const T = TYPES[b.type], n = Math.floor(T.drop * levelDef().drop + Math.random());
   for (let i = 0; i < n; i++) addDrop(b.x, b.y, 'shell', 1);
   if (T.conch) addDrop(b.x, b.y, 'conch', T.conch);
   sfx('cry');
@@ -801,8 +803,9 @@ function hitCastle(c, d) {
 // Sunshades: babies walk underneath, but sand balls can't get through the canopy (its shadow on the sand).
 const SHADE_R = 26;
 const shades = () => levelDef().shades || [];
-function shadeBlocks(x1, y1, x2, y2) {         // does a shade stand between two points?
+function shadeBlocks(x1, y1, x2, y2) {         // does a shade stand between two points? (not the one the shooter is under)
   for (const [sx, sy] of shades()) {
+    if (Math.hypot(x1 - sx, y1 - sy) < SHADE_R) continue;
     const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1;
     const t = clamp(((sx - x1) * dx + (sy - y1) * dy) / l2, 0, 1);
     if (Math.hypot(x1 + dx * t - sx, y1 + dy * t - sy) < SHADE_R) return true;
@@ -819,7 +822,7 @@ function nearest(x, y, range) {
   return t;
 }
 function shoot(x, y, a, dmg, max) {
-  ents.balls.push({ x, y, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, dist: 0, max, dmg });
+  ents.balls.push({ x, y, ox: x, oy: y, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, dist: 0, max, dmg });
 }
 
 function update(dt) {
@@ -873,7 +876,7 @@ function update(dt) {
     const bl = ents.balls[i];
     bl.x += bl.vx * dt; bl.y += bl.vy * dt; bl.dist += 380 * dt;
     let gone = bl.dist > bl.max || bl.x < -10 || bl.x > W + 10 || bl.y < 40 || bl.y > H + 10;
-    if (!gone) for (const [sx, sy, col] of shades()) if (Math.hypot(bl.x - sx, bl.y - sy) < SHADE_R) { gone = true; puff(bl.x, bl.y, 30, 4, col); sfx('thud'); break; }
+    if (!gone) for (const [sx, sy, col] of shades()) if (Math.hypot(bl.x - sx, bl.y - sy) < SHADE_R && Math.hypot(bl.ox - sx, bl.oy - sy) >= SHADE_R) { gone = true; puff(bl.x, bl.y, 30, 4, col); sfx('thud'); break; }
     if (!gone) {
       for (const b of ents.babies) {
         if (b.state !== 'walk') continue;
