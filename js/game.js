@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 34 · 14 nov 2026';
+const VERSION = 'Versión 35 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -244,13 +244,19 @@ function drawBaby(b) {
     ctx.beginPath(); ctx.arc(-.8, cy + 1.4, .8, .2, Math.PI - .2); ctx.arc(.8, cy + 1.4, .8, .2, Math.PI - .2); ctx.stroke();
   }
   ctx.fillStyle = 'rgba(255,130,150,.55)'; ell(-7.2, cy + 3.4, 1.9, 1.1); ctx.fill(); ell(7.2, cy + 3.4, 1.9, 1.1); ctx.fill();
-  if (b.type === 'boss') {      // golden crown, and a dummy while he is not crying
-    ctx.fillStyle = tint('#ffcc33', f); ctx.strokeStyle = '#c8901a'; ctx.lineWidth = .7; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(-6, cy - 7.5); ctx.lineTo(-6.5, cy - 13); ctx.lineTo(-3.2, cy - 10.2); ctx.lineTo(0, cy - 14.5); ctx.lineTo(3.2, cy - 10.2); ctx.lineTo(6.5, cy - 13); ctx.lineTo(6, cy - 7.5); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#e0453f'; ell(0, cy - 9.5, 1, 1); ctx.fill(); ctx.fillStyle = '#3dc8e8'; ell(-4, cy - 9, .8, .8); ctx.fill(); ell(4, cy - 9, .8, .8); ctx.fill();
+  if (b.type === 'boss') {      // a big dummy (dropped while crying) and a beach spade to wreck castles with
+    const swing = Math.sin(b.t * (b.atkT < .3 ? 14 : 4)) * .35;
+    ctx.save(); ctx.translate(9.5, -11 - bob); ctx.rotate(.55 + swing * .6);
+    ctx.strokeStyle = tint('#ffd23f', f); ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(0, -12); ctx.stroke();                    // handle
+    ctx.fillStyle = tint('#ffd23f', f); rr(ctx, -2.6, 3.5, 5.2, 2.6, 1.2); ctx.fill();        // grip
+    ctx.fillStyle = tint('#2c6fe0', f); ctx.beginPath(); ctx.moveTo(-3, -11); ctx.lineTo(3, -11); ctx.quadraticCurveTo(4.6, -20, 0, -24); ctx.quadraticCurveTo(-4.6, -20, -3, -11); ctx.fill();   // blade
+    ctx.restore();
+    ctx.fillStyle = tint(b.skin, f); ell(8, -11 - bob, 2.4, 2.4); ctx.fill();          // hand on the handle
     if (!cry) {
-      ctx.fillStyle = '#7bc8f0'; ell(0, cy + 2.6, 3, 1.6); ctx.fill();
-      ctx.strokeStyle = '#ff7aa2'; ctx.lineWidth = .9; ctx.beginPath(); ctx.arc(0, cy + 4.6, 1.5, 0, TAU); ctx.stroke();
+      ctx.fillStyle = tint('#7bc8f0', f); ctx.strokeStyle = '#4a9cc8'; ctx.lineWidth = .5; ell(0, cy + 2.8, 4.6, 2.5); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff'; ell(-1.6, cy + 2.2, 1.1, .6); ctx.fill();
+      ctx.strokeStyle = tint('#ff7aa2', f); ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, cy + 6.2, 2.2, 0, TAU); ctx.stroke();
     }
   }
   ctx.restore();
