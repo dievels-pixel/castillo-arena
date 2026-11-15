@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 46 · 15 nov 2026';
+const VERSION = 'Versión 47 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -469,15 +469,32 @@ const TYPES = {
   bossCrawl: { hp: 40, sp: 20, r: 25, drop: 0, conch: 0, atk: 6, rate: 1.1, sc: 2.4, boss: true, crawl: true }
 };
 const LEVEL_WAVES = 10;                   // waves per level; the last one brings the boss
+// Economy granularity: babies drop ECON times the shells, and every upgrade comes in ECON smaller steps whose prices
+// add up to the same as one old step (in today's shells). Same difficulty, ECON times more purchases.
+const ECON = 3;
+// Small steps let leftover shells work sooner, so shells are multiplied a little less than ECON to keep the
+// difficulty where it was (checked with simulated games on the three levels).
+const DROP_K = 2.8;
+// Upgrades as designed per "big step" (k = big steps; val(k) = value); each big step is split into ECON levels.
 const UPG = {
-  rate:  { name: 'Cadencia', base: 8,  g: 1.4,  max: 10, val: l => 1.6 + .45 * l,  fmt: v => f1(v) + ' bolas/s' },
-  power: { name: 'Daño',     base: 10, g: 1.4,  max: 10, val: l => 2 + .6 * l,     fmt: v => 'daño ' + f1(v) },
-  range: { name: 'Alcance',  base: 6,  g: 1.35, max: 8,  val: l => (175 + 14 * l) / 20, fmt: v => f1(v) + ' m' },
-  magnet: { name: 'Imán de conchas', base: 6, g: 1.35, max: 8, val: l => (78 + 16 * l) / 20, fmt: v => 'atrae a ' + f1(v) + ' m' }
+  rate:  { name: 'Cadencia', base: 8,  g: 1.4,  steps: 10, val: k => 1.6 + .45 * k,  fmt: v => f1(v) + ' bolas/s' },
+  power: { name: 'Daño',     base: 10, g: 1.4,  steps: 10, val: k => 2 + .6 * k,     fmt: v => 'daño ' + f1(v) },
+  range: { name: 'Alcance',  base: 6,  g: 1.35, steps: 8,  val: k => (175 + 14 * k) / 20, fmt: v => f1(v) + ' m' },
+  magnet: { name: 'Imán de conchas', base: 6, g: 1.35, steps: 8, val: k => (78 + 16 * k) / 20, fmt: v => 'atrae a ' + f1(v) + ' m' }
 };
-const upCost = (u, l) => Math.ceil(u.base * Math.pow(u.g, l));
+for (const id in UPG) UPG[id].max = UPG[id].steps * ECON;
+const upVal = (id, l) => UPG[id].val(l / ECON);
+// price of level l when a big step (base * g^k) is split into ECON levels growing by c = g^(1/ECON)
+function stepCost(base, g, l) {
+  const c = Math.pow(g, 1 / ECON); let sum = 0; for (let i = 0; i < ECON; i++) sum += Math.pow(c, i);
+  return Math.max(1, Math.round(base * ECON / sum * Math.pow(c, l)));
+}
+const upCost = (u, l) => stepCost(u.base, u.g, l);
+const REPAIR = Math.round(35 / ECON);                    // castle life back per repair
 const repairCost = () => 5 + 2 * S.wave;
-const fRate = () => .7 + .12 * S.friendLvl, fDmg = () => 1.5 + .5 * S.friendLvl, F_RANGE = 150;
+const TRAIN_MAX = 6 * ECON;
+const fRateAt = l => .7 + .12 * l / ECON, fDmgAt = l => 1.5 + .5 * l / ECON;
+const fRate = () => fRateAt(S.friendLvl), fDmg = () => fDmgAt(S.friendLvl), F_RANGE = 150;
 
 const cam = { x: CX - VW / 2, y: 0 };
 let S, best = 0, bestKills = 0, mode = 'start';   // mode: start | play | pause | shop
@@ -489,20 +506,20 @@ const amigos = n => n + (n === 1 ? ' amigo' : ' amigos');
 function itemState(id) {
   if (UPG[id]) {
     const u = UPG[id], l = S.up[id], maxed = l >= u.max;
-    return { name: u.name, now: u.fmt(u.val(l)), next: maxed ? '' : u.fmt(u.val(l + 1)), note: 'Nivel ' + l + ' de ' + u.max, cost: maxed ? 0 : upCost(u, l), maxed, enabled: true };
+    return { name: u.name, now: u.fmt(upVal(id, l)), next: maxed ? '' : u.fmt(upVal(id, l + 1)), note: 'Nivel ' + l + ' de ' + u.max, cost: maxed ? 0 : upCost(u, l), maxed, enabled: true };
   }
   if (id === 'friend') {
     const n = S.friends.length + S.pending, maxed = n >= 6;
-    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Tú eliges dónde cava su agujero', cost: maxed ? 0 : FRIEND_COST[n], maxed, enabled: true };
+    return { name: 'Reclutar amigo', now: amigos(n), next: maxed ? '' : amigos(n + 1), note: 'Tú eliges dónde cava su agujero', cost: maxed ? 0 : FRIEND_COST[n] * ECON, maxed, enabled: true };
   }
   if (id === 'train') {
-    const l = S.friendLvl, maxed = l >= 6, has = S.friends.length + S.pending > 0, fmt = k => f1(.7 + .12 * k) + ' b/s · daño ' + f1(1.5 + .5 * k);
-    return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de 6, para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : Math.ceil(25 * Math.pow(1.5, l)), maxed, enabled: has };
+    const l = S.friendLvl, maxed = l >= TRAIN_MAX, has = S.friends.length + S.pending > 0, fmt = k => f1(fRateAt(k)) + ' b/s · daño ' + f1(fDmgAt(k));
+    return { name: 'Entrenar amigos', now: fmt(l), next: maxed ? '' : fmt(l + 1), note: has ? 'Nivel ' + l + ' de ' + TRAIN_MAX + ', para todos' : 'Primero recluta un amigo', cost: maxed ? 0 : stepCost(25, 1.5, l), maxed, enabled: has };
   }
   const hurt = S.hp < 100, many = S.castles.length > 1, fmt = c => Math.ceil(c.hp);
   return { name: many ? 'Reparar castillos' : 'Reparar castillo', now: S.castles.map(fmt).join(' y ') + (many ? '' : '/100'),
-    next: hurt ? S.castles.map(c => Math.min(100, fmt(c) + 35)).join(' y ') + (many ? '' : '/100') : '',
-    note: hurt ? (many ? 'Cada castillo recupera 35' : 'Recupera 35') : (many ? 'Están enteros' : 'Está entero'), cost: repairCost(), maxed: false, enabled: hurt };
+    next: hurt ? S.castles.map(c => Math.min(100, fmt(c) + REPAIR)).join(' y ') + (many ? '' : '/100') : '',
+    note: hurt ? (many ? 'Cada castillo recupera ' + REPAIR : 'Recupera ' + REPAIR) : (many ? 'Están enteros' : 'Está entero'), cost: repairCost(), maxed: false, enabled: hurt };
 }
 const affordable = id => { const st = itemState(id); return !st.maxed && st.enabled && S.shells >= st.cost; };
 function buy(id) {
@@ -511,7 +528,7 @@ function buy(id) {
   if (UPG[id]) S.up[id]++;
   else if (id === 'friend') S.pending++;
   else if (id === 'train') S.friendLvl++;
-  else { for (const c of S.castles) c.hp = Math.min(100, c.hp + 35); syncHp(); S.repaired = true; }
+  else { for (const c of S.castles) c.hp = Math.min(100, c.hp + REPAIR); syncHp(); S.repaired = true; }
   updateHud(); sfx('buy'); puff(S.player.x, S.player.y, 30, 14, '#fff3b0'); drawShop();
 }
 const SHELL_SVG = '<svg class="ic"><use href="#shell"/></svg>';
@@ -824,9 +841,9 @@ function addDrop(x, y, kind, v) {
 function die(b) {
   S.kills++; b.state = 'cry'; b.cryT = 0;
   const c = nearestCastle(b.x, b.y), dx = b.x - c.x, dy = b.y - c.y, d = Math.hypot(dx, dy) || 1; b.fx = dx / d; b.fy = dy / d;
-  const T = TYPES[b.type], n = Math.floor(T.drop * levelDef().drop + Math.random());
+  const T = TYPES[b.type], n = Math.floor(T.drop * levelDef().drop * DROP_K + Math.random());
   for (let i = 0; i < n; i++) addDrop(b.x, b.y, 'shell', 1);
-  if (T.conch) addDrop(b.x, b.y, 'conch', T.conch);
+  if (T.conch) addDrop(b.x, b.y, 'conch', Math.round(T.conch * DROP_K));
   sfx('cry');
   if (Math.random() < .6) floatText(['¡Buaaa!', '¡Uaaa!', '¡Buaaaa!'][Math.floor(Math.random() * 3)], b.x, b.y, 44);
 }
@@ -909,12 +926,12 @@ function update(dt) {
   followCam(dt);
 
   // kid auto fire
-  const range = 175 + 14 * S.up.range, target = nearest(p.x, p.y, range);
+  const range = upVal('range', S.up.range) * 20, target = nearest(p.x, p.y, range);
   if (target) p.aim = Math.atan2(target.y - p.y, target.x - p.x);
   else if (p.moving) p.aim = Math.atan2(iy, ix);
   p.fireT -= dt;
   if (p.fireT <= 0) {
-    if (target) { shoot(p.x + Math.cos(p.aim) * 10, p.y + Math.sin(p.aim) * 10, p.aim, 2 + .6 * S.up.power, range + 40); p.kick = .1; sfx('throw'); p.fireT = 1 / (1.6 + .45 * S.up.rate); }
+    if (target) { shoot(p.x + Math.cos(p.aim) * 10, p.y + Math.sin(p.aim) * 10, p.aim, upVal('power', S.up.power), range + 40); p.kick = .1; sfx('throw'); p.fireT = 1 / upVal('rate', S.up.rate); }
     else p.fireT = 0;
   }
 
@@ -976,7 +993,7 @@ function update(dt) {
   ents.babies = ents.babies.filter(b => !(b.state === 'cry' && (b.cryT > 3.2 || b.x < -30 || b.x > W + 30 || b.y > H + 30 || b.y < 30)));
 
   // drops (the magnet pulls shells within its radius; it can be upgraded)
-  const magR = 78 + 16 * S.up.magnet;
+  const magR = upVal('magnet', S.up.magnet) * 20;
   for (let i = ents.drops.length - 1; i >= 0; i--) {
     const s = ents.drops[i]; s.t += dt;
     const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
