@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 41 · 15 nov 2026';
+const VERSION = 'Versión 42 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -546,6 +546,7 @@ function spotProblem(x, y) {
   if (S.castles.some(c => ((x - c.x) / (115 * CS)) ** 2 + ((y - c.y) / (55 * CS)) ** 2 < 1)) return 'Encima del castillo no';
   if (y > Math.min(...S.castles.map(c => c.y)) - 50) return 'Tiene que estar delante del castillo, hacia el mar';
   if (S.friends.some(f => Math.hypot(f.x - x, f.y - y) < FRIEND_GAP)) return 'Muy cerca de otro amigo';
+  if (shades().some(([sx, sy]) => Math.hypot(sx - x, sy - y) < SHADE_R + 6)) return 'Debajo de una sombrilla no';
   return '';
 }
 function recruit(x, y) {
@@ -849,6 +850,10 @@ function update(dt) {
   for (const c of S.castles) {
     const pdx = p.x - c.x, pdy = p.y - c.y, pd = Math.hypot(pdx, pdy), pr = 66 * CS;
     if (pd < pr && pd > .01) { p.x = c.x + pdx / pd * pr; p.y = c.y + pdy / pd * pr; }
+  }
+  for (const [sx, sy] of shades()) {     // sunshades are obstacles for the kid (babies crawl underneath)
+    const pdx = p.x - sx, pdy = p.y - sy, pd = Math.hypot(pdx, pdy), pr = SHADE_R;
+    if (pd < pr && pd > .01) { p.x = sx + pdx / pd * pr; p.y = sy + pdy / pd * pr; }
   }
   followCam(dt);
 
