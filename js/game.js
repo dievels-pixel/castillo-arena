@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 37 · 15 nov 2026';
+const VERSION = 'Versión 38 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -21,7 +21,7 @@ const CR = Math.round(62 * CS);           // a castle's attack radius
 // Each level: where its castles stand (x, y). Babies go for the nearest castle; if any falls, the level is lost.
 const LEVEL_DEFS = {
   1: { castles: [[300, 440]] },
-  2: { castles: [[160, 450], [440, 450]] }
+  2: { castles: [[160, 450], [440, 450]], float: true }
 };
 let currentLevel = 1;
 const levelDef = () => LEVEL_DEFS[currentLevel] || LEVEL_DEFS[1];
@@ -222,6 +222,14 @@ function drawBaby(b) {
     ctx.fillStyle = skD; ell(-4 + sw * 1.4, -1.5, 3.2, 2); ctx.fill(); ell(4 - sw * 1.4, -1.5, 3.2, 2); ctx.fill();
     ctx.fillStyle = sk; ell(0, -11 - bob, 6, 5); ctx.fill();
     ctx.fillStyle = dia; ell(0, -6 - bob * .5, 7.5, 5); ctx.fill(); ctx.strokeStyle = '#e1e1e1'; ctx.lineWidth = .8; ctx.stroke();
+    if (b.ring > 0) {                          // striped swim ring round the waist
+      const ry = -8 - bob * .7;
+      for (let k = 0; k < 8; k++) {
+        ctx.fillStyle = tint(k % 2 ? '#ffffff' : '#ff5d4a', f);
+        ctx.beginPath(); ctx.ellipse(0, ry, 11, 5, 0, k / 8 * TAU, (k + 1) / 8 * TAU); ctx.ellipse(0, ry, 6.5, 2.6, 0, (k + 1) / 8 * TAU, k / 8 * TAU, true); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,.6)'; ell(-6, ry - 2.6, 2.2, .9, -.3); ctx.fill();
+    }
     ctx.fillStyle = sk;
     if (cry) { ell(-7, -18 - bob, 2.2, 4.2, .5); ctx.fill(); ell(7, -18 - bob, 2.2, 4.2, -.5); ctx.fill(); }
     else { ell(-7, -10 - bob + sw * 1.5, 2.2, 4, .25); ctx.fill(); ell(7, -10 - bob - sw * 1.5, 2.2, 4, -.25); ctx.fill(); }
@@ -270,10 +278,10 @@ function drawBaby(b) {
     }
   }
   ctx.restore();
-  if (b.state === 'walk' && b.hp < b.max && b.type !== 'boss') {
-    const top = b.y + (cy - 11) * sc, fr = clamp(b.hp / b.max, .02, 1);
+  if (b.state === 'walk' && b.type !== 'boss' && (b.hp < b.max || (b.ring > 0 && b.ring < b.ringMax) || b.type === 'float')) {
+    const top = b.y + (cy - 11) * sc, onRing = b.ring > 0, fr = clamp(onRing ? b.ring / b.ringMax : b.hp / b.max, .02, 1);
     ctx.fillStyle = 'rgba(0,0,0,.45)'; rr(ctx, b.x - 11, top - 4, 22, 4, 2); ctx.fill();
-    ctx.fillStyle = '#ff5d4a'; rr(ctx, b.x - 10.5, top - 3.5, 21 * fr, 3, 1.5); ctx.fill();
+    ctx.fillStyle = onRing ? '#3dc8e8' : '#ff5d4a'; rr(ctx, b.x - 10.5, top - 3.5, 21 * fr, 3, 1.5); ctx.fill();
   }
 }
 function drawHole(x, y) {
@@ -398,6 +406,7 @@ function sfx(name) {
     case 'wave': tone('triangle', 392, 392, .14, .16); tone('triangle', 523, 523, .22, .16, .13); break;
     case 'clear': [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f, .14, .14, i * .08)); break;
     case 'castle': tone('sine', 95, 50, .2, .35); noise(.12, .1, 300, 'lowpass'); break;
+    case 'pop': noise(.12, .3, 1800); tone('square', 900, 200, .12, .08); break;
     case 'over': [392, 330, 262].forEach((f, i) => tone('triangle', f, f * .97, .32, .18, i * .3)); break;
   }
 }
@@ -417,6 +426,8 @@ const TYPES = {
   crawl:  { hp: 3,  sp: 62, r: 9,  drop: .8,  conch: 0, atk: 2, rate: .6,  sc: .95 },
   big:    { hp: 14, sp: 22, r: 16, drop: 2,   conch: 3, atk: 9, rate: 1.1, sc: 1.45 },
   // the boss comes once, halfway through the last wave of the level
+  // float baby (from level 2): its swim ring takes as much as the baby before it pops, so it lasts twice as long
+  float:  { hp: 4,  sp: 30, r: 12, drop: 2,   conch: 0, atk: 3, rate: .9,  sc: 1 },
   boss:   { hp: 110, sp: 13, r: 27, drop: 0,  conch: 0, atk: 10, rate: 1.5, sc: 2.6 }
 };
 const LEVEL_WAVES = 10;                   // waves per level; the last one brings the boss
@@ -746,14 +757,15 @@ function gameOver() {
 function spawnBaby(boss) {
   const n = S.wave, r = Math.random();
   const pBig = n >= 3 ? Math.min(.3, (n - 2) * .06) : 0, pCr = n >= 2 ? Math.min(.35, (n - 1) * .08) : 0;
-  const type = boss ? 'boss' : r < pBig ? 'big' : (r < pBig + pCr ? 'crawl' : 'normal');
+  const pFl = levelDef().float && n >= 2 ? Math.min(.3, (n - 1) * .05) : 0;
+  const type = boss ? 'boss' : r < pBig ? 'big' : r < pBig + pCr ? 'crawl' : r < pBig + pCr + pFl ? 'float' : 'normal';
   const T = TYPES[type], hs = 1 + .12 * (n - 1);
   let x, y;
   if (boss) { x = W / 2 + rnd(-120, 120); y = 60; }
   else if (Math.random() < .7) { x = 24 + Math.random() * (W - 48); y = 66; }
   else { x = Math.random() < .5 ? -12 : W + 12; y = 90 + Math.random() * 200; }
   const skin = SKINS[Math.floor(Math.random() * SKINS.length)];
-  ents.babies.push({ type, x, y, hp: T.hp * hs, max: T.hp * hs, sp: T.sp * (.9 + Math.random() * .2), r: T.r,
+  ents.babies.push({ type, x, y, hp: T.hp * hs, max: T.hp * hs, ring: type === 'float' ? T.hp * hs : 0, ringMax: T.hp * hs, sp: T.sp * (.9 + Math.random() * .2), r: T.r,
     skin, skinD: darken(skin), hair: boss ? 0 : Math.floor(Math.random() * 4), hairC: HAIRS[Math.floor(Math.random() * HAIRS.length)],
     state: 'walk', flash: 0, t: Math.random() * 6, atkT: Math.random() * .5, rate: T.rate, atk: T.atk, cryT: 0, fx: 0, fy: 0 });
 }
@@ -852,7 +864,10 @@ function update(dt) {
       for (const b of ents.babies) {
         if (b.state !== 'walk') continue;
         if (Math.hypot(b.x - bl.x, b.y - bl.y) < b.r + 4) {
-          b.hp -= bl.dmg; b.flash = .12;
+          if (b.ring > 0) {                       // the swim ring soaks up the hits until it pops
+            b.ring -= bl.dmg; b.flash = .12;
+            if (b.ring <= 0) { b.ring = 0; puff(b.x, b.y, 12, 14, '#ff5d4a'); sfx('pop'); floatText('¡Plof!', b.x, b.y, 30); }
+          } else { b.hp -= bl.dmg; b.flash = .12; }
           const l = Math.hypot(bl.vx, bl.vy), kb = b.type === 'boss' ? 0 : 3; b.x += bl.vx / l * kb; b.y += bl.vy / l * kb;
           puff(bl.x, bl.y, 20, 5, '#d4ad6a'); sfx('hit');
           if (b.hp <= 0) die(b);
