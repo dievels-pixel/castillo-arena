@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 45 · 15 nov 2026';
+const VERSION = 'Versión 46 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -27,8 +27,9 @@ const LEVEL_DEFS = {
   // well wins it about 1 time in 4 (level 1: about 6 in 10)
   2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.5,
        shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] },
-  // level 3: two castles set apart differently, sunshades, float babies and crabs that pinch the kid
-  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, boss: 'bossCrawl', count: .5, drop: 1.5, crabs: 5,
+  // level 3: two castles set apart differently, sunshades, float and bucket babies, crabs that pinch the kid and a
+  // crawling boss. Tuned with simulated games: a player who buys well wins it about 1 time in 4 or 5
+  3: { castles: [[180, 440], [420, 470]], float: true, helmet: true, boss: 'bossCrawl', count: .5, drop: 1.55, crabs: 5,
        shades: [[180, 300, '#ffd23f'], [420, 330, '#e0457b'], [300, 230, '#3dc8e8']] }
 };
 // Crabs: step on one and it holds the kid for PINCH_TIME seconds (he still throws, but can't walk). 1,5 s is
@@ -465,7 +466,7 @@ const TYPES = {
   float:  { hp: 4,  sp: 30, r: 12, drop: 2,   conch: 0, atk: 3, rate: .9,  sc: 1 },
   boss:   { hp: 110, sp: 13, r: 27, drop: 0,  conch: 0, atk: 10, rate: 1.5, sc: 2.6, boss: true },
   // boss of level 3: a huge crawler, faster than the walking boss but with less life
-  bossCrawl: { hp: 80, sp: 24, r: 25, drop: 0, conch: 0, atk: 8, rate: 1.1, sc: 2.4, boss: true, crawl: true }
+  bossCrawl: { hp: 40, sp: 20, r: 25, drop: 0, conch: 0, atk: 6, rate: 1.1, sc: 2.4, boss: true, crawl: true }
 };
 const LEVEL_WAVES = 10;                   // waves per level; the last one brings the boss
 const UPG = {
