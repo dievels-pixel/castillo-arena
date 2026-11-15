@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 40 · 15 nov 2026';
+const VERSION = 'Versión 41 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -23,8 +23,10 @@ const CR = Math.round(62 * CS);           // a castle's attack radius
 // Babies go for the nearest castle; if any falls, the level is lost.
 const LEVEL_DEFS = {
   1: { castles: [[300, 440]], count: 1, drop: 1 },
-  2: { castles: [[160, 450], [440, 450]], float: true, count: 1, drop: 1,
-       shades: [[160, 300, '#ff5d4a'], [440, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [300, 365, '#8e5bd9']] }
+  // level 2, tuned with simulated games: half the babies of level 1 but 50 % more shells each; a player who buys
+  // well wins it about 1 time in 4 (level 1: about 6 in 10)
+  2: { castles: [[200, 450], [400, 450]], float: true, count: .5, drop: 1.5,
+       shades: [[200, 300, '#ff5d4a'], [400, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [110, 380, '#8e5bd9']] }
 };
 let currentLevel = 1;
 const levelDef = () => LEVEL_DEFS[currentLevel] || LEVEL_DEFS[1];
