@@ -9,7 +9,7 @@ const f1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 const rnd = (a, b) => a + Math.random() * (b - a);
 const TAU = Math.PI * 2;
 // Version shown on the start and pause screens. Bump the number and date with every change.
-const VERSION = 'Versión 38 · 15 nov 2026';
+const VERSION = 'Versión 39 · 15 nov 2026';
 document.querySelectorAll('.ver').forEach(e => { e.textContent = VERSION; });
 
 /* ---------- world constants. Everything is drawn and simulated in "beach pixels" (360x640); 20 px = 1 m.
@@ -21,7 +21,8 @@ const CR = Math.round(62 * CS);           // a castle's attack radius
 // Each level: where its castles stand (x, y). Babies go for the nearest castle; if any falls, the level is lost.
 const LEVEL_DEFS = {
   1: { castles: [[300, 440]] },
-  2: { castles: [[160, 450], [440, 450]], float: true }
+  2: { castles: [[160, 450], [440, 450]], float: true,
+       shades: [[160, 300, '#ff5d4a'], [440, 300, '#2c6fe0'], [300, 215, '#2fb86a'], [300, 365, '#8e5bd9']] }
 };
 let currentLevel = 1;
 const levelDef = () => LEVEL_DEFS[currentLevel] || LEVEL_DEFS[1];
@@ -391,7 +392,7 @@ function noise(dur, vol, freq, type) {
   src.buffer = noiseBuf; f.type = type || 'bandpass'; f.frequency.value = freq; env(g, t, vol, dur);
   src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .05);
 }
-const SFX_GAP = { throw: 70, hit: 45, cry: 200, pick: 40, pay: 90, castle: 120 };
+const SFX_GAP = { thud: 80, throw: 70, hit: 45, cry: 200, pick: 40, pay: 90, castle: 120 };
 function sfx(name) {
   if (muted || !ac || ac.state !== 'running') return;
   const now = performance.now(); if (now - (lastSfx[name] || 0) < (SFX_GAP[name] || 0)) return; lastSfx[name] = now;
@@ -407,6 +408,7 @@ function sfx(name) {
     case 'clear': [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, f, .14, .14, i * .08)); break;
     case 'castle': tone('sine', 95, 50, .2, .35); noise(.12, .1, 300, 'lowpass'); break;
     case 'pop': noise(.12, .3, 1800); tone('square', 900, 200, .12, .08); break;
+    case 'thud': noise(.07, .1, 700); break;
     case 'over': [392, 330, 262].forEach((f, i) => tone('triangle', f, f * .97, .32, .18, i * .3)); break;
   }
 }
@@ -796,12 +798,23 @@ function hitCastle(c, d) {
   puff(c.x + rnd(-40, 40) * CS, c.y + 8 * CS, 30, 3, '#d9b873'); updateHud();
   if (c.hp <= 0) gameOver();
 }
+// Sunshades: babies walk underneath, but sand balls can't get through the canopy (its shadow on the sand).
+const SHADE_R = 26;
+const shades = () => levelDef().shades || [];
+function shadeBlocks(x1, y1, x2, y2) {         // does a shade stand between two points?
+  for (const [sx, sy] of shades()) {
+    const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1;
+    const t = clamp(((sx - x1) * dx + (sy - y1) * dy) / l2, 0, 1);
+    if (Math.hypot(x1 + dx * t - sx, y1 + dy * t - sy) < SHADE_R) return true;
+  }
+  return false;
+}
 function nearest(x, y, range) {
   let t = null, bd = 1e9;
   for (const b of ents.babies) {
     if (b.state !== 'walk') continue;
     const d = Math.hypot(b.x - x, b.y - y);
-    if (d - b.r <= range && d < bd) { bd = d; t = b; }
+    if (d - b.r <= range && d < bd && !shadeBlocks(x, y, b.x, b.y)) { bd = d; t = b; }
   }
   return t;
 }
@@ -860,6 +873,7 @@ function update(dt) {
     const bl = ents.balls[i];
     bl.x += bl.vx * dt; bl.y += bl.vy * dt; bl.dist += 380 * dt;
     let gone = bl.dist > bl.max || bl.x < -10 || bl.x > W + 10 || bl.y < 40 || bl.y > H + 10;
+    if (!gone) for (const [sx, sy, col] of shades()) if (Math.hypot(bl.x - sx, bl.y - sy) < SHADE_R) { gone = true; puff(bl.x, bl.y, 30, 4, col); sfx('thud'); break; }
     if (!gone) {
       for (const b of ents.babies) {
         if (b.state !== 'walk') continue;
@@ -954,6 +968,17 @@ function drawOffscreen() {
   }
 }
 
+function drawShade([sx, sy, col]) {      // pole and striped canopy
+  const top = sy - 34;
+  ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, top); ctx.stroke();
+  for (let k = 0; k < 8; k++) {
+    ctx.fillStyle = k % 2 ? '#fdf6e4' : col;
+    ctx.beginPath(); ctx.moveTo(sx, top - 6); ctx.ellipse(sx, top, SHADE_R + 3, (SHADE_R + 3) * .45, 0, k / 8 * TAU, (k + 1) / 8 * TAU); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.beginPath(); ctx.ellipse(sx, top, SHADE_R + 3, (SHADE_R + 3) * .45, 0, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = '#fff'; ell(sx, top - 6, 2, 2); ctx.fill();
+}
+
 /* ---------- drawing ---------- */
 const order = [];
 function render(now) {
@@ -970,6 +995,10 @@ function render(now) {
   for (const bl of ents.balls) { ell(bl.x, bl.y, 3, 1.3); ctx.fill(); }
 
   for (const f of S.friends) drawHole(f.x, f.y);
+  for (const [sx, sy] of shades()) {     // the shade on the sand: babies here can't be hit
+    ctx.fillStyle = 'rgba(90,60,20,.2)'; ell(sx, sy, SHADE_R, SHADE_R * .62); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,60,20,.18)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.ellipse(sx, sy, SHADE_R, SHADE_R * .62, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  }
 
   if (mode === 'place') {     // where the new friend would dig, and what it would reach
     const bad = !!spotProblem(p.x, p.y);
@@ -992,12 +1021,14 @@ function render(now) {
   // standing things, back to front
   order.length = 0;
   for (const c of S.castles) order.push({ y: c.y + 16, k: 0, o: c });
+  for (const sh of shades()) order.push({ y: sh[1] + SHADE_R * .62, k: 5, o: sh });   // covers whoever is under it
   for (const f of S.friends) order.push({ y: f.y, k: 2, o: f });
   for (const b of ents.babies) order.push({ y: b.y, k: 3, o: b });
   order.push({ y: p.y, k: 4 });
   order.sort((a, b) => a.y - b.y);
   for (const e of order) {
     if (e.k === 0) drawCastle(e.o, now);
+    else if (e.k === 5) drawShade(e.o);
     else if (e.k === 2) drawFriend(e.o, now);
     else if (e.k === 3) drawBaby(e.o);
     else drawKid(p.x, p.y, Object.assign(KID_LOOK, { aim: p.aim, moving: p.moving, walk: p.walk, kick: p.kick }));
